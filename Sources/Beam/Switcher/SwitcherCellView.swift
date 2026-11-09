@@ -8,6 +8,13 @@ final class SwitcherCellView: NSTableCellView {
 
     private static let font = NSFont.systemFont(ofSize: 14)
     private static let matchFont = NSFont.systemFont(ofSize: 14, weight: .bold)
+    /// An attributed title wraps by default, whatever the field's own line
+    /// break mode, so it carries its own.
+    private static let truncating: NSParagraphStyle = {
+        let style = NSMutableParagraphStyle()
+        style.lineBreakMode = .byTruncatingTail
+        return style
+    }()
 
     private let symbol = NSImageView()
     private let title = NSTextField(labelWithString: "")
@@ -61,7 +68,9 @@ final class SwitcherCellView: NSTableCellView {
         let text = NSMutableAttributedString()
         for (offset, character) in item.title.enumerated() {
             let font = matched.contains(offset) ? Self.matchFont : Self.font
-            text.append(NSAttributedString(string: String(character), attributes: [.font: font]))
+            text.append(
+                NSAttributedString(
+                    string: String(character), attributes: [.font: font, .paragraphStyle: Self.truncating]))
         }
         title.attributedStringValue = text
         detail.stringValue = item.detail
