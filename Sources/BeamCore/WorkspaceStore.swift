@@ -7,7 +7,7 @@ import Foundation
 /// starts a shell when selected again) or archived (hidden until shown or
 /// reopened). An unpinned workspace closes with its last pane.
 public struct WorkspaceStore: Codable, Equatable, Sendable {
-    /// In the order they were opened.
+    /// In the order the user arranged them, new ones last.
     public private(set) var workspaces: [Workspace] = []
     public private(set) var selection: Workspace.ID?
     public var showsArchived = false
@@ -25,7 +25,7 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
     }
 
     /// Sidebar order: pinned, then the rest, then archived when shown, each
-    /// group in the order opened.
+    /// group in the order of `workspaces`.
     public var sidebar: [Workspace] {
         unarchived + (showsArchived ? workspaces.filter(\.isArchived) : [])
     }
@@ -68,6 +68,25 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
         let unarchived = unarchived
         guard unarchived.indices.contains(position) else { return }
         select(unarchived[position].id)
+    }
+
+    /// Moves `id` to the gap above the row at `position` in `unarchived`, as
+    /// a table reports a drop; `unarchived.count` is the end. The workspace
+    /// joins the group of its new neighbours, pinned or not, and keeps its
+    /// own when it lands between the two. Archived workspaces do not move.
+    public mutating func moveWorkspace(_ id: Workspace.ID, to position: Int) {
+        var rows = unarchived
+        guard let from = rows.firstIndex(where: { $0.id == id }) else { return }
+        let index = min(max(position > from ? position - 1 : position, 0), rows.count - 1)
+        guard index != from else { return }
+        var moved = rows.remove(at: from)
+        let neighbours = [index > 0 ? rows[index - 1] : nil, index < rows.count ? rows[index] : nil]
+            .compactMap { $0?.isPinned }
+        if let pinned = neighbours.first, neighbours.allSatisfy({ $0 == pinned }) {
+            moved.isPinned = pinned
+        }
+        rows.insert(moved, at: index)
+        workspaces = rows + workspaces.filter(\.isArchived)
     }
 
     public mutating func selectNext() { selectAdjacent(offset: 1) }

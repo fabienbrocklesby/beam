@@ -91,6 +91,76 @@ struct WorkspaceStoreTests {
         #expect(store.workspace(two)?.isArchived == true)
     }
 
+    // MARK: Reordering
+
+    @Test func movingAWorkspaceReordersTheSidebar() {
+        var (store, one, _, three) = makeStore()
+        store.moveWorkspace(one, to: 0)
+        #expect(folders(store.sidebar) == ["/one", "/three", "/two"])
+        store.moveWorkspace(one, to: 3)
+        #expect(folders(store.sidebar) == ["/three", "/two", "/one"])
+        store.moveWorkspace(three, to: 2)
+        #expect(folders(store.sidebar) == ["/two", "/three", "/one"])
+    }
+
+    @Test func droppingAWorkspaceWhereItIsChangesNothing() {
+        var (store, _, two, three) = makeStore()
+        store.setPinned(three, true)
+        let before = store
+        store.moveWorkspace(three, to: 0)
+        store.moveWorkspace(three, to: 1)
+        store.moveWorkspace(two, to: 2)
+        #expect(store == before)
+    }
+
+    @Test func aMovedWorkspaceJoinsTheGroupOfItsNewNeighbours() {
+        var (store, one, two, three) = makeStore()
+        store.setPinned(three, true)
+
+        store.moveWorkspace(one, to: 0)
+        #expect(folders(store.sidebar) == ["/one", "/three", "/two"])
+        #expect(store.workspace(one)?.isPinned == true)
+
+        store.moveWorkspace(one, to: 3)
+        #expect(folders(store.sidebar) == ["/three", "/two", "/one"])
+        #expect(store.workspace(one)?.isPinned == false)
+
+        store.moveWorkspace(two, to: 0)
+        #expect(folders(store.sidebar) == ["/two", "/three", "/one"])
+        #expect(store.workspace(two)?.isPinned == true)
+    }
+
+    @Test func aWorkspaceDroppedBetweenTheGroupsKeepsItsOwn() {
+        var (store, one, two, three) = makeStore()
+        store.setPinned(three, true)
+        store.moveWorkspace(one, to: 1)
+        #expect(folders(store.sidebar) == ["/three", "/one", "/two"])
+        #expect(store.workspace(one)?.isPinned == false)
+
+        store.setPinned(two, true)
+        store.moveWorkspace(three, to: 2)
+        #expect(folders(store.sidebar) == ["/two", "/three", "/one"])
+        #expect(store.workspace(three)?.isPinned == true)
+    }
+
+    @Test func archivedWorkspacesStayLastAndDoNotMove() {
+        var (store, one, two, _) = makeStore()
+        store.setArchived(two, true)
+        store.showsArchived = true
+        store.moveWorkspace(two, to: 0)
+        #expect(folders(store.sidebar) == ["/three", "/one", "/two"])
+        store.moveWorkspace(one, to: 0)
+        #expect(folders(store.sidebar) == ["/one", "/three", "/two"])
+    }
+
+    @Test func switchingByNumberFollowsTheNewOrder() {
+        var (store, one, _, _) = makeStore()
+        store.select(at: 0)
+        store.moveWorkspace(one, to: 0)
+        store.select(at: 0)
+        #expect(store.selection == one)
+    }
+
     // MARK: Panes
 
     @Test func movingAPaneRearrangesItsWorkspaceAndFocusesIt() throws {

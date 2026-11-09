@@ -138,6 +138,8 @@ extension MainWindowController: NSMenuItemValidation {
             update { $0.setArchived(id, false) }
         case .close:
             closeWorkspace(id)
+        case .move(let position):
+            update { $0.moveWorkspace(id, to: position) }
         }
     }
 

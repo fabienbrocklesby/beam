@@ -10,6 +10,8 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         case setColor(Workspace.Color?)
         case setArchived(Bool)
         case close
+        /// Moves the workspace to the gap above this row, as dropped.
+        case move(to: Int)
     }
 
     /// What a row shows, so the table reloads only when that changes.
@@ -61,6 +63,10 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         tableView.dataSource = self
         tableView.delegate = self
         tableView.setAccessibilityLabel("Workspaces")
+        // Rows drag to a new place, the others parting to show where.
+        tableView.registerForDraggedTypes([.beamWorkspace])
+        tableView.setDraggingSourceOperationMask(.move, forLocal: true)
+        tableView.draggingDestinationFeedbackStyle = .gap
 
         let menu = NSMenu()
         menu.delegate = self
@@ -100,6 +106,38 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
             ?? WorkspaceCellView()
         cell.show(rows[row])
         return cell
+    }
+
+    // MARK: Dragging rows
+
+    func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
+        guard rows.indices.contains(row), !rows[row].isArchived else { return nil }
+        let item = NSPasteboardItem()
+        item.setString(rows[row].id.description, forType: .beamWorkspace)
+        return item
+    }
+
+    func tableView(
+        _ tableView: NSTableView, validateDrop info: any NSDraggingInfo, proposedRow row: Int,
+        proposedDropOperation dropOperation: NSTableView.DropOperation
+    ) -> NSDragOperation {
+        // Archived rows come last and stay there, so a drop lands above them.
+        let movable = rows.count { !$0.isArchived }
+        guard row <= movable else { return [] }
+        if dropOperation == .on { tableView.setDropRow(row, dropOperation: .above) }
+        return .move
+    }
+
+    func tableView(
+        _ tableView: NSTableView, acceptDrop info: any NSDraggingInfo, row: Int,
+        dropOperation: NSTableView.DropOperation
+    ) -> Bool {
+        guard
+            let id = info.draggingPasteboard.string(forType: .beamWorkspace)
+                .flatMap(UUID.init(uuidString:)).map({ Workspace.ID(uuid: $0) })
+        else { return false }
+        onCommand?(.move(to: row), id)
+        return true
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
