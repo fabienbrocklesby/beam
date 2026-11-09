@@ -1,0 +1,8 @@
+#!/bin/sh
+# The fast half of `make check`: style, text lint, debug build and tests.
+# `make check` adds the release build and the budgets. Output only on failure.
+set -eu
+if ! output="$(make --no-print-directory lint test 2>&1)"; then
+  printf '%s\n' "$output" >&2
+  exit 1
+fi

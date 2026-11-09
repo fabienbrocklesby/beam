@@ -1,0 +1,21 @@
+#!/bin/sh
+# Enforces the commit message rules in CONTRIBUTING.md on the message git will
+# record: comments and everything below a `git commit -v` scissors line are
+# dropped first, as git's default cleanup does.
+set -eu
+comment="$(git config core.commentChar || echo '#')"
+message="$(sed "/^$comment -* >8 -*\$/,\$d" "$1" | grep -v "^$comment" || true)"
+subject="$(printf '%s\n' "$message" | sed -n 1p)"
+
+if [ "${#subject}" -gt 72 ]; then
+  echo "error: subject is ${#subject} characters, the limit is 72" >&2
+  exit 1
+fi
+if [ -n "$(printf '%s\n' "$message" | sed -n 2p)" ]; then
+  echo "error: leave a blank line between the subject and the body" >&2
+  exit 1
+fi
+if printf '%s\n' "$message" | grep -qE "$(printf '\342\200\223|\342\200\224')"; then
+  echo "error: em or en dash in the commit message (use a comma, a colon, or rewrite)" >&2
+  exit 1
+fi

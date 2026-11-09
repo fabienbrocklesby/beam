@@ -1,0 +1,3 @@
+# Beam's defaults. The user's Ghostty config and Beam's own settings file load
+# after this one, so any setting there wins.
+theme = light:Apple System Colors Light,dark:Apple System Colors
