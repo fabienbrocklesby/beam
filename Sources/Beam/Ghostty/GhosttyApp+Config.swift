@@ -7,6 +7,8 @@ extension GhosttyApp {
     /// How panes look next to each other, from the `unfocused-split-*` and
     /// `split-divider-color` options.
     struct SplitStyle {
+        /// The terminal's background, which pane chrome shares.
+        var background: NSColor
         /// How strongly `unfocusedFill` covers an unfocused pane, from 0 to 1.
         var unfocusedFillOpacity: Double
         var unfocusedFill: NSColor
@@ -45,7 +47,9 @@ extension GhosttyApp {
             dividerColor = base.blended(withFraction: isLight ? 0.08 : 0.4, of: .black) ?? base
         }
 
-        return SplitStyle(unfocusedFillOpacity: 1 - opacity, unfocusedFill: NSColor(fill), dividerColor: dividerColor)
+        return SplitStyle(
+            background: NSColor(background), unfocusedFillOpacity: 1 - opacity, unfocusedFill: NSColor(fill),
+            dividerColor: dividerColor)
     }
 
     /// The key the user's config binds to a keybinding `action` such as

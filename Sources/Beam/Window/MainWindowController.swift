@@ -265,7 +265,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
         let id = pane.id
         terminal.onEvent = { [weak self] event in self?.handle(event, from: id) ?? false }
-        return PaneView(id: id, terminal: terminal, style: style)
+        let view = PaneView(id: id, terminal: terminal, style: style)
+        view.directory = pane.workingDirectory
+        return view
     }
 
     // MARK: NSWindowDelegate

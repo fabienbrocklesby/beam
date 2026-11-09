@@ -71,6 +71,7 @@ final class WorkspaceView: NSView {
 
         let shown = tree.zoomed.map { [$0] } ?? tree.panes.map(\.id)
         for view in wanted {
+            view.showsHeader = wanted.count > 1
             if !shown.contains(view.id) {
                 view.emphasis = .unfocused
             } else if shown.count == 1 {

@@ -20,6 +20,7 @@ extension MainWindowController: NSMenuItemValidation {
 
         case .workingDirectoryChanged(let directory):
             LaunchTime.promptReached()
+            paneViews[pane]?.directory = directory
             update { $0.updatePane(pane) { $0.workingDirectory = directory } }
 
         case .commandFinished:
