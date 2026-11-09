@@ -234,6 +234,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         view.onEqualize = { [weak self] path in
             self?.update { $0.modifyTree(of: id) { $0.equalize(at: path) } }
         }
+        view.onMovePane = { [weak self] pane, target, drop in
+            self?.update { $0.movePane(pane, onto: target, drop) }
+        }
         view.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(view)
         let safeArea = content.safeAreaLayoutGuide

@@ -15,6 +15,8 @@ final class WorkspaceView: NSView {
     var onRatioChange: ((SplitTree.Path, Double) -> Void)?
     /// The user double-clicked the divider of the split at `path`.
     var onEqualize: ((SplitTree.Path) -> Void)?
+    /// The user dropped a pane's header onto another pane.
+    var onMovePane: ((Pane.ID, Pane.ID, SplitTree.Drop) -> Void)?
 
     var style: GhosttyApp.SplitStyle {
         didSet { needsDisplay = true }
@@ -23,11 +25,17 @@ final class WorkspaceView: NSView {
     private var tree = SplitTree()
     private var dividers: [DividerView] = []
     private var paneViews: [PaneView] { subviews.compactMap { $0 as? PaneView } }
+    private let dropPreview = DropPreview()
+    /// Where the pane being dragged would land, while it is over another.
+    private var pendingDrop: (pane: Pane.ID, target: Pane.ID, drop: SplitTree.Drop)?
 
     init(style: GhosttyApp.SplitStyle) {
         self.style = style
         super.init(frame: .zero)
         wantsLayer = true
+        // Terminals take files and text, not panes, so a pane dragged over
+        // one comes up the chain to here.
+        registerForDraggedTypes([.beamPane])
     }
 
     @available(*, unavailable)
@@ -108,6 +116,52 @@ final class WorkspaceView: NSView {
         }
     }
 
+    // MARK: Dropping a pane
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        draggingUpdated(sender)
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        let point = convert(sender.draggingLocation, from: nil)
+        let frames = tree.layout(in: bounds, dividerThickness: Self.dividerThickness).frames
+        guard
+            let pane = sender.draggingPasteboard.string(forType: .beamPane)
+                .flatMap(UUID.init(uuidString:)).map({ Pane.ID(uuid: $0) }),
+            let (target, frame) = frames.first(where: { $0.value.contains(point) }).map({ ($0.key, $0.value) }),
+            target != pane, tree.contains(pane)
+        else {
+            endDrop()
+            return []
+        }
+        let drop = SplitTree.Drop(at: point, in: frame)
+        if pendingDrop?.target != target || pendingDrop?.drop != drop {
+            dropPreview.show(drop.preview(in: frame), in: self)
+        }
+        pendingDrop = (pane, target, drop)
+        return .move
+    }
+
+    override func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        endDrop()
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        guard let pendingDrop else { return false }
+        endDrop()
+        onMovePane?(pendingDrop.pane, pendingDrop.target, pendingDrop.drop)
+        return true
+    }
+
+    override func draggingEnded(_ sender: any NSDraggingInfo) {
+        endDrop()
+    }
+
+    private func endDrop() {
+        pendingDrop = nil
+        dropPreview.hide()
+    }
+
     private func updateVisibility() {
         for view in paneViews {
             view.terminal.setVisible(!isHiddenOrHasHiddenAncestor && (tree.zoomed == nil || tree.zoomed == view.id))
@@ -124,5 +178,66 @@ final class WorkspaceView: NSView {
         view.onDoubleClick = { [weak self] divider in self?.onEqualize?(divider.path) }
         addSubview(view)
         return view
+    }
+}
+
+/// Shows where a dragged pane will land: a tinted, rounded outline of the
+/// space it will take, which glides between places as the pointer moves.
+private final class DropPreview: NSView {
+    private static let inset = 4.0
+
+    /// Whether it is on screen, fading out counting as gone.
+    private var isShowing = false
+
+    init() {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 8
+        layer?.borderWidth = 1.5
+        alphaValue = 0
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        return nil
+    }
+
+    override var wantsUpdateLayer: Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    // Runs with this view's appearance current, so the accent colour resolves
+    // for light or dark mode.
+    override func updateLayer() {
+        layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
+        layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.8).cgColor
+    }
+
+    func show(_ frame: CGRect, in parent: NSView) {
+        let target = frame.insetBy(dx: Self.inset, dy: Self.inset)
+        // Above the panes and the dividers' grab areas.
+        if parent.subviews.last !== self {
+            parent.addSubview(self, positioned: .above, relativeTo: nil)
+        }
+        // It appears where the pane would land, then glides from place to place.
+        if !isShowing {
+            self.frame = target
+            isShowing = true
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.15
+            context.allowsImplicitAnimation = true
+            animator().frame = target
+            animator().alphaValue = 1
+        }
+    }
+
+    func hide() {
+        guard isShowing else { return }
+        isShowing = false
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.12
+            animator().alphaValue = 0
+        }
     }
 }

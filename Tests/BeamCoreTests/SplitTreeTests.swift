@@ -318,6 +318,68 @@ struct SplitTreeTests {
         #expect(tree.neighbour(of: a.id, toward: .right, in: bounds) == b.id)
     }
 
+    // MARK: Moving panes
+
+    @Test func aDropSwapsInTheMiddleAndSplitsTowardTheNearestEdge() {
+        let frame = CGRect(x: 100, y: 50, width: 400, height: 200)
+        #expect(SplitTree.Drop(at: CGPoint(x: 300, y: 150), in: frame) == .swap)
+        #expect(SplitTree.Drop(at: CGPoint(x: 110, y: 150), in: frame) == .beside(.left))
+        #expect(SplitTree.Drop(at: CGPoint(x: 490, y: 150), in: frame) == .beside(.right))
+        #expect(SplitTree.Drop(at: CGPoint(x: 300, y: 55), in: frame) == .beside(.up))
+        #expect(SplitTree.Drop(at: CGPoint(x: 300, y: 245), in: frame) == .beside(.down))
+        // Edges are measured relative to the pane's size, so a wide pane's
+        // corner goes to the edge the pointer is proportionally closer to.
+        #expect(SplitTree.Drop(at: CGPoint(x: 105, y: 55), in: frame) == .beside(.left))
+        #expect(SplitTree.Drop(at: CGPoint(x: 160, y: 52), in: frame) == .beside(.up))
+    }
+
+    @Test func aDropPreviewsTheSpaceThePaneWillTake() {
+        let frame = CGRect(x: 100, y: 50, width: 400, height: 200)
+        #expect(SplitTree.Drop.swap.preview(in: frame) == frame)
+        #expect(SplitTree.Drop.beside(.left).preview(in: frame) == CGRect(x: 100, y: 50, width: 200, height: 200))
+        #expect(SplitTree.Drop.beside(.right).preview(in: frame) == CGRect(x: 300, y: 50, width: 200, height: 200))
+        #expect(SplitTree.Drop.beside(.up).preview(in: frame) == CGRect(x: 100, y: 50, width: 400, height: 100))
+        #expect(SplitTree.Drop.beside(.down).preview(in: frame) == CGRect(x: 100, y: 150, width: 400, height: 100))
+    }
+
+    @Test func movingAPaneBesideAnotherSplitsTheTarget() throws {
+        var tree = threePanes
+        tree.move(a.id, onto: c.id, .beside(.right))
+        #expect(tree.panes.map(\.id) == [b.id, c.id, a.id])
+        let frames = tree.layout(in: bounds, dividerThickness: 1).frames
+        let movedFrame = try #require(frames[a.id])
+        let targetFrame = try #require(frames[c.id])
+        #expect(movedFrame.minX > targetFrame.minX)
+        #expect(movedFrame.minY == targetFrame.minY)
+        #expect(tree.pane(a.id) == a)
+    }
+
+    @Test func swappingPanesTradesTheirPlaces() {
+        let before = threePanes.layout(in: bounds, dividerThickness: 1).frames
+        var tree = threePanes
+        tree.move(a.id, onto: c.id, .swap)
+        #expect(tree.panes.map(\.id) == [c.id, b.id, a.id])
+        let after = tree.layout(in: bounds, dividerThickness: 1).frames
+        #expect(after[c.id] == before[a.id])
+        #expect(after[a.id] == before[c.id])
+        #expect(tree.pane(a.id) == a)
+    }
+
+    @Test func movingOntoItselfOrAMissingPaneChangesNothing() {
+        var tree = threePanes
+        tree.move(a.id, onto: a.id, .beside(.down))
+        tree.move(a.id, onto: d.id, .swap)
+        tree.move(d.id, onto: a.id, .beside(.left))
+        #expect(tree == threePanes)
+    }
+
+    @Test func movingAPaneEndsZoom() {
+        var tree = threePanes
+        tree.toggleZoom(b.id)
+        tree.move(a.id, onto: c.id, .swap)
+        #expect(tree.zoomed == nil)
+    }
+
     // MARK: Persistence
 
     @Test func treeRoundTripsThroughJSON() throws {

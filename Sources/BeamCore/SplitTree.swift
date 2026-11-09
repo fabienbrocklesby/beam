@@ -105,6 +105,20 @@ public struct SplitTree: Codable, Equatable, Sendable {
         return focus
     }
 
+    /// Moves `id` onto `target` as `drop` says, keeping the moved pane as it
+    /// is. Nothing changes when either is missing or they are the same pane.
+    public mutating func move(_ id: Pane.ID, onto target: Pane.ID, _ drop: Drop) {
+        guard id != target, let moved = pane(id), let replaced = pane(target) else { return }
+        switch drop {
+        case .swap:
+            root = root?.mappingPanes { $0.id == id ? replaced : $0.id == target ? moved : $0 }
+            zoomed = nil
+        case .beside(let direction):
+            remove(id)
+            split(target, toward: direction, inserting: moved)
+        }
+    }
+
     // MARK: Ratios
 
     public mutating func setRatio(_ ratio: Double, at path: Path) {
@@ -206,6 +220,17 @@ extension SplitTree.Node {
         case .split(var split):
             split.first = split.first.replacingPane(id, with: replacement)
             split.second = split.second.replacingPane(id, with: replacement)
+            return .split(split)
+        }
+    }
+
+    func mappingPanes(_ transform: (Pane) -> Pane) -> Self {
+        switch self {
+        case .pane(let pane):
+            return .pane(transform(pane))
+        case .split(var split):
+            split.first = split.first.mappingPanes(transform)
+            split.second = split.second.mappingPanes(transform)
             return .split(split)
         }
     }

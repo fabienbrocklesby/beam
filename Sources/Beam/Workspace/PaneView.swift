@@ -56,7 +56,7 @@ final class PaneView: NSView {
         self.id = id
         self.terminal = terminal
         overlay = Overlay(style: style)
-        header = PaneHeaderView(style: style)
+        header = PaneHeaderView(pane: id, style: style)
         super.init(frame: terminal.frame)
         header.isHidden = true
         addSubview(terminal)

@@ -93,6 +93,29 @@ struct WorkspaceStoreTests {
 
     // MARK: Panes
 
+    @Test func movingAPaneRearrangesItsWorkspaceAndFocusesIt() throws {
+        var (store, one, _, _) = makeStore()
+        let first = try #require(store.workspace(one)?.focusedPane)
+        let secondResult = store.split(first, toward: .right)
+        let second = try #require(secondResult)
+        store.focus(first)
+
+        store.movePane(second, onto: first, .beside(.up))
+        let workspace = try #require(store.workspace(one))
+        #expect(workspace.tree.panes.map(\.id) == [second, first])
+        #expect(workspace.focusedPane == second)
+    }
+
+    @Test func aPaneDoesNotMoveIntoAnotherWorkspace() throws {
+        var (store, one, two, _) = makeStore()
+        let first = try #require(store.workspace(one)?.focusedPane)
+        let other = try #require(store.workspace(two)?.focusedPane)
+        let before = store
+        store.movePane(first, onto: other, .beside(.left))
+        store.movePane(first, onto: first, .swap)
+        #expect(store == before)
+    }
+
     @Test func splitAddsAFocusedPaneInTheWorkspaceFolder() throws {
         var (store, one, _, _) = makeStore()
         let first = try #require(store.workspace(one)?.focusedPane)

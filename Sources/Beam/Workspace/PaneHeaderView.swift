@@ -2,9 +2,12 @@ import AppKit
 import BeamCore
 
 /// The strip along the top of a pane in a split: the pane's title and a
-/// close button. Clicking it focuses the pane and double-clicking zooms it.
-final class PaneHeaderView: NSView {
+/// close button. Clicking it focuses the pane, double-clicking zooms it, and
+/// dragging it moves the pane somewhere else in the workspace.
+final class PaneHeaderView: NSView, NSDraggingSource {
     static let height = 24.0
+    /// How far the pointer travels before a press becomes a drag.
+    private static let dragThreshold = 3.0
 
     var title = "" {
         didSet { label.stringValue = title }
@@ -22,10 +25,13 @@ final class PaneHeaderView: NSView {
     var onToggleZoom: (() -> Void)?
     var onClose: (() -> Void)?
 
+    private let pane: Pane.ID
     private let label = NSTextField(labelWithString: "")
     private let closeButton = NSButton()
+    private var pressLocation: NSPoint?
 
-    init(style: GhosttyApp.SplitStyle) {
+    init(pane: Pane.ID, style: GhosttyApp.SplitStyle) {
+        self.pane = pane
         self.style = style
         super.init(frame: .zero)
         wantsLayer = true
@@ -79,20 +85,55 @@ final class PaneHeaderView: NSView {
 
     override var mouseDownCanMoveWindow: Bool { false }
 
-    // A header in an inactive window focuses on the first click.
+    // A header in an inactive window focuses and drags on the first click.
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     @objc private func close() {
         onClose?()
     }
 
-    // MARK: Clicking
+    // MARK: Clicking and dragging
 
     override func mouseDown(with event: NSEvent) {
+        pressLocation = event.locationInWindow
         if event.clickCount == 2 {
             onToggleZoom?()
         } else {
             onFocus?()
         }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let start = pressLocation else { return }
+        let location = event.locationInWindow
+        guard hypot(location.x - start.x, location.y - start.y) >= Self.dragThreshold else { return }
+        pressLocation = nil
+
+        let item = NSPasteboardItem()
+        item.setString(pane.description, forType: .beamPane)
+        let dragging = NSDraggingItem(pasteboardWriter: item)
+        dragging.setDraggingFrame(bounds, contents: snapshot())
+        let session = beginDraggingSession(with: [dragging], event: event, source: self)
+        session.animatesToStartingPositionsOnCancelOrFail = true
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        pressLocation = nil
+    }
+
+    func draggingSession(
+        _ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext
+    ) -> NSDragOperation {
+        context == .withinApplication ? .move : []
+    }
+
+    /// The header as it looks now, for the drag to carry.
+    private func snapshot() -> NSImage {
+        let image = NSImage(size: bounds.size)
+        if let bitmap = bitmapImageRepForCachingDisplay(in: bounds) {
+            cacheDisplay(in: bounds, to: bitmap)
+            image.addRepresentation(bitmap)
+        }
+        return image
     }
 }

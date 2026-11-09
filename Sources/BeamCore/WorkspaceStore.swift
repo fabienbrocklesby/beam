@@ -196,6 +196,16 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
         return pane.id
     }
 
+    /// Moves `pane` onto `target` as `drop` says and focuses it. Both must be
+    /// in the same workspace.
+    public mutating func movePane(_ pane: Pane.ID, onto target: Pane.ID, _ drop: SplitTree.Drop) {
+        modifyWorkspace(containing: pane) { workspace in
+            guard pane != target, workspace.tree.contains(target) else { return }
+            workspace.tree.move(pane, onto: target, drop)
+            workspace.focusedPane = pane
+        }
+    }
+
     public mutating func toggleZoom(_ pane: Pane.ID) {
         modifyWorkspace(containing: pane) { $0.tree.toggleZoom(pane) }
     }
