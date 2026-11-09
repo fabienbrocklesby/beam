@@ -21,16 +21,18 @@ extension AgentState {
         }
     }
 
-    /// The symbol in the state's colour.
+    /// The symbol in the state's colour. A filled symbol's glyph is its first
+    /// layer and needs a colour of its own: one palette colour paints every
+    /// layer, leaving a plain dot.
     var image: NSImage? {
-        let color: NSColor =
+        let colors: [NSColor] =
             switch self {
-            case .working: .secondaryLabelColor
-            case .waiting: .systemOrange
-            case .done: .systemGreen
+            case .working: [.secondaryLabelColor]
+            case .waiting: [.white, .systemOrange]
+            case .done: [.white, .systemGreen]
             }
         return NSImage(systemSymbolName: symbolName, accessibilityDescription: title)?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: [color]))
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: colors))
     }
 
     /// What the agent said, or the state's title when it said nothing.
