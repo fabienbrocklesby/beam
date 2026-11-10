@@ -46,13 +46,14 @@ extension GhosttyApp {
             value(of: "unfocused-split-fill", into: &fill)
             ? NSColor(fill) : isLight ? base.blended(withFraction: 0.12, of: .black) ?? base : base
 
-        // Without an explicit colour, darken the background the way Ghostty does.
+        // Without an explicit colour, darken the background the way Ghostty
+        // does, a little more on a light one, where its shade vanishes.
         var divider = ghostty_config_color_s()
         let dividerColor: NSColor
         if value(of: "split-divider-color", into: &divider) {
             dividerColor = NSColor(divider)
         } else {
-            dividerColor = base.blended(withFraction: isLight ? 0.08 : 0.4, of: .black) ?? base
+            dividerColor = base.blended(withFraction: isLight ? 0.14 : 0.4, of: .black) ?? base
         }
 
         return SplitStyle(
