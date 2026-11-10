@@ -70,23 +70,26 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
         select(unarchived[position].id)
     }
 
-    /// Moves `id` to the gap above the row at `position` in `unarchived`, as
-    /// a table reports a drop; `unarchived.count` is the end. The workspace
-    /// joins the group of its new neighbours, pinned or not, and keeps its
-    /// own when it lands between the two. Archived workspaces do not move.
-    public mutating func moveWorkspace(_ id: Workspace.ID, to position: Int) {
-        var rows = unarchived
-        guard let from = rows.firstIndex(where: { $0.id == id }) else { return }
-        let index = min(max(position > from ? position - 1 : position, 0), rows.count - 1)
-        guard index != from else { return }
-        var moved = rows.remove(at: from)
-        let neighbours = [index > 0 ? rows[index - 1] : nil, index < rows.count ? rows[index] : nil]
-            .compactMap { $0?.isPinned }
-        if let pinned = neighbours.first, neighbours.allSatisfy({ $0 == pinned }) {
-            moved.isPinned = pinned
+    /// Moves `id` into the pinned or the unpinned section, to the gap above
+    /// the row at `position` in that section as the sidebar shows it, as a
+    /// table reports a drop; the section's count is its end. The section
+    /// decides pinning, since the end of one and the start of the other are
+    /// the same place in the list. Archived workspaces do not move.
+    public mutating func moveWorkspace(_ id: Workspace.ID, pinned: Bool, to position: Int) {
+        let rows = unarchived
+        guard var moved = rows.first(where: { $0.id == id }) else { return }
+        var section = rows.filter { $0.isPinned == pinned }
+        var index = position
+        if let from = section.firstIndex(where: { $0.id == id }) {
+            if index > from { index -= 1 }
+            section.remove(at: from)
         }
-        rows.insert(moved, at: index)
-        workspaces = rows + workspaces.filter(\.isArchived)
+        moved.isPinned = pinned
+        section.insert(moved, at: min(max(index, 0), section.count))
+        let others = rows.filter { $0.isPinned != pinned && $0.id != id }
+        let ordered = pinned ? section + others : others + section
+        guard ordered != rows else { return }
+        workspaces = ordered + workspaces.filter(\.isArchived)
     }
 
     public mutating func selectNext() { selectAdjacent(offset: 1) }

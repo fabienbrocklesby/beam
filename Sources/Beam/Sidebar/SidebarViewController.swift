@@ -1,8 +1,9 @@
 import AppKit
 import BeamCore
 
-/// The workspace list. Shows what it is given and reports what the user asks
-/// for; the window controller owns the store and decides.
+/// The workspace list, in sections: Pinned, the rest under Workspaces, and
+/// Archived while shown. Shows what it is given and reports what the user
+/// asks for; the window controller owns the store and decides.
 final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
     enum Command {
         case select
@@ -10,8 +11,9 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         case setColor(Workspace.Color?)
         case setArchived(Bool)
         case close
-        /// Moves the workspace to the gap above this row, as dropped.
-        case move(to: Int)
+        /// Moves the workspace into the pinned or unpinned section, to the gap
+        /// above this row of it, as dropped.
+        case move(pinned: Bool, to: Int)
     }
 
     /// What a row shows, so the table reloads only when that changes.
@@ -43,10 +45,32 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         let workspace: Workspace.ID
     }
 
+    private enum Section {
+        case pinned
+        case workspaces
+        case archived
+
+        var title: String {
+            switch self {
+            case .pinned: "Pinned"
+            case .workspaces: "Workspaces"
+            case .archived: "Archived"
+            }
+        }
+    }
+
+    /// A line of the table: a section's header, or a workspace.
+    private enum Item: Equatable {
+        case header(Section)
+        case row(Row)
+    }
+
     var onCommand: ((Command, Workspace.ID) -> Void)?
+    /// The Workspaces header's add button was clicked.
+    var onNewWorkspace: (() -> Void)?
 
     private let tableView = NSTableView()
-    private var rows: [Row] = []
+    private var items: [Item] = []
     /// Set while `show` changes the table, whose own selection changes then
     /// are not the user's.
     private var isShowing = false
@@ -56,6 +80,7 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         tableView.headerView = nil
         tableView.addTableColumn(NSTableColumn(identifier: NSUserInterfaceItemIdentifier("Workspace")))
         tableView.allowsEmptySelection = false
+        tableView.floatsGroupRows = false
         // Rows with a git branch take a second line.
         tableView.usesAutomaticRowHeights = true
         // Picking a workspace puts the keyboard in its terminal, not the list.
@@ -86,34 +111,68 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         isShowing = true
         defer { isShowing = false }
         let rows = workspaces.map { Row($0, branch: branches[$0.id], agent: agents[$0.id]) }
-        if rows != self.rows {
-            self.rows = rows
+        let pinned = rows.filter { $0.isPinned && !$0.isArchived }
+        let archived = rows.filter(\.isArchived)
+        // Workspaces always shows, as the home of the add button and a place
+        // to drop a workspace to unpin it.
+        var items = pinned.isEmpty ? [] : [.header(.pinned)] + pinned.map(Item.row)
+        items += [.header(.workspaces)] + rows.filter { !$0.isPinned && !$0.isArchived }.map(Item.row)
+        if !archived.isEmpty { items += [.header(.archived)] + archived.map(Item.row) }
+        if items != self.items {
+            self.items = items
             tableView.reloadData()
         }
-        let selected = rows.firstIndex { $0.id == selection }.map { IndexSet(integer: $0) } ?? IndexSet()
+        let selected = items.indices.first { row(at: $0)?.id == selection }.map { IndexSet(integer: $0) } ?? IndexSet()
         if tableView.selectedRowIndexes != selected {
             tableView.selectRowIndexes(selected, byExtendingSelection: false)
         }
     }
 
+    /// The workspace on table row `index`, or nil for a header.
+    private func row(at index: Int) -> Row? {
+        guard items.indices.contains(index), case .row(let row) = items[index] else { return nil }
+        return row
+    }
+
+    @objc private func newWorkspace() {
+        onNewWorkspace?()
+    }
+
     // MARK: Table
 
-    func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
+    func numberOfRows(in tableView: NSTableView) -> Int { items.count }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let cell =
-            tableView.makeView(withIdentifier: WorkspaceCellView.identifier, owner: nil) as? WorkspaceCellView
-            ?? WorkspaceCellView()
-        cell.show(rows[row])
-        return cell
+        switch items[row] {
+        case .header(let section):
+            let cell =
+                tableView.makeView(withIdentifier: SidebarHeaderCellView.identifier, owner: nil)
+                as? SidebarHeaderCellView ?? SidebarHeaderCellView()
+            cell.show(section.title, add: section == .workspaces ? (self, #selector(newWorkspace)) : nil)
+            return cell
+        case .row(let workspace):
+            let cell =
+                tableView.makeView(withIdentifier: WorkspaceCellView.identifier, owner: nil) as? WorkspaceCellView
+                ?? WorkspaceCellView()
+            cell.show(workspace)
+            return cell
+        }
+    }
+
+    func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool {
+        self.row(at: row) == nil
+    }
+
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+        self.row(at: row) != nil
     }
 
     // MARK: Dragging rows
 
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
-        guard rows.indices.contains(row), !rows[row].isArchived else { return nil }
+        guard let workspace = self.row(at: row), !workspace.isArchived else { return nil }
         let item = NSPasteboardItem()
-        item.setString(rows[row].id.description, forType: .beamWorkspace)
+        item.setString(workspace.id.description, forType: .beamWorkspace)
         return item
     }
 
@@ -121,10 +180,10 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         _ tableView: NSTableView, validateDrop info: any NSDraggingInfo, proposedRow row: Int,
         proposedDropOperation dropOperation: NSTableView.DropOperation
     ) -> NSDragOperation {
-        // Archived rows come last and stay there, so a drop lands above them.
-        let movable = rows.count { !$0.isArchived }
-        guard row <= movable else { return [] }
-        if dropOperation == .on { tableView.setDropRow(row, dropOperation: .above) }
+        // Above the first header is the start of the first section.
+        let target = max(row, 1)
+        guard destination(above: target) != nil else { return [] }
+        if target != row || dropOperation == .on { tableView.setDropRow(target, dropOperation: .above) }
         return .move
     }
 
@@ -134,24 +193,40 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
     ) -> Bool {
         guard
             let id = info.draggingPasteboard.string(forType: .beamWorkspace)
-                .flatMap(UUID.init(uuidString:)).map({ Workspace.ID(uuid: $0) })
+                .flatMap(UUID.init(uuidString:)).map({ Workspace.ID(uuid: $0) }),
+            let (pinned, position) = destination(above: row)
         else { return false }
-        onCommand?(.move(to: row), id)
+        onCommand?(.move(pinned: pinned, to: position), id)
         return true
     }
 
+    /// Where a drop in the gap above table row `row` lands: whether its
+    /// section is the pinned one, and the position among that section's
+    /// rows. The gap above a header ends the section before it. Nothing
+    /// lands among the archived rows.
+    private func destination(above row: Int) -> (pinned: Bool, position: Int)? {
+        var position = 0
+        for item in items[..<min(row, items.count)].reversed() {
+            switch item {
+            case .row: position += 1
+            case .header(.pinned): return (true, position)
+            case .header(.workspaces): return (false, position)
+            case .header(.archived): return nil
+            }
+        }
+        return nil
+    }
+
     func tableViewSelectionDidChange(_ notification: Notification) {
-        let row = tableView.selectedRow
-        guard !isShowing, rows.indices.contains(row) else { return }
-        onCommand?(.select, rows[row].id)
+        guard !isShowing, let workspace = row(at: tableView.selectedRow) else { return }
+        onCommand?(.select, workspace.id)
     }
 
     // MARK: Context menu
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        guard rows.indices.contains(tableView.clickedRow) else { return }
-        let row = rows[tableView.clickedRow]
+        guard let row = row(at: tableView.clickedRow) else { return }
 
         menu.addItem(item(row.isPinned ? "Unpin" : "Pin", .setPinned(!row.isPinned), row))
 

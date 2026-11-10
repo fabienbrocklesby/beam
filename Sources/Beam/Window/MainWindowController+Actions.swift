@@ -100,7 +100,8 @@ extension MainWindowController: NSMenuItemValidation {
         return true
     }
 
-    private func chooseWorkspaceFolder() {
+    /// Asks for a project folder and opens a workspace for it.
+    func chooseWorkspaceFolder() {
         guard let window else { return }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -138,8 +139,8 @@ extension MainWindowController: NSMenuItemValidation {
             update { $0.setArchived(id, false) }
         case .close:
             closeWorkspace(id)
-        case .move(let position):
-            update { $0.moveWorkspace(id, to: position) }
+        case .move(let pinned, let position):
+            update { $0.moveWorkspace(id, pinned: pinned, to: position) }
         }
     }
 

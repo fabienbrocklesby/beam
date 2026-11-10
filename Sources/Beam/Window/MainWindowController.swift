@@ -91,6 +91,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window.setFrameAutosaveName("Main")
 
         sidebar.onCommand = { [weak self] command, id in self?.perform(command, on: id) }
+        sidebar.onNewWorkspace = { [weak self] in self?.chooseWorkspaceFolder() }
         launcher.onLaunch = { [weak self] entry in self?.open(entry) }
         launcher.show(installed: installedAgents.agents)
         installedAgents.onChange = { [weak self] in

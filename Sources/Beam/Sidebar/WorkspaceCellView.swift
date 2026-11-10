@@ -1,8 +1,9 @@
 import AppKit
 import BeamCore
 
-/// A sidebar row: colour tag, folder name with its git branch below, its
-/// most urgent agent's state, and a pin or archive mark.
+/// A sidebar row: colour tag, folder name with its git branch below, and
+/// its most urgent agent's state. Its section says whether it is pinned or
+/// archived.
 final class WorkspaceCellView: NSTableCellView {
     static let identifier = NSUserInterfaceItemIdentifier("WorkspaceCell")
 
@@ -10,7 +11,6 @@ final class WorkspaceCellView: NSTableCellView {
     private let name = NSTextField(labelWithString: "")
     private let branch = NSTextField(labelWithString: "")
     private let agent = NSImageView()
-    private let mark = NSImageView()
 
     init() {
         super.init(frame: .zero)
@@ -22,8 +22,6 @@ final class WorkspaceCellView: NSTableCellView {
         branch.lineBreakMode = .byTruncatingTail
         branch.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         agent.symbolConfiguration = NSImage.SymbolConfiguration(scale: .medium)
-        mark.contentTintColor = .secondaryLabelColor
-        mark.symbolConfiguration = NSImage.SymbolConfiguration(scale: .small)
         textField = name
         imageView = dot
 
@@ -33,10 +31,10 @@ final class WorkspaceCellView: NSTableCellView {
         text.alignment = .leading
         text.spacing = 0
 
-        // The marks sit at the trailing edge however short the name is.
+        // The mark sits at the trailing edge however short the name is.
         let stack = NSStackView()
         stack.setViews([dot, text], in: .leading)
-        stack.setViews([agent, mark], in: .trailing)
+        stack.setViews([agent], in: .trailing)
         stack.orientation = .horizontal
         stack.spacing = 6
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -63,11 +61,6 @@ final class WorkspaceCellView: NSTableCellView {
         name.textColor = row.isArchived ? .secondaryLabelColor : .labelColor
         branch.stringValue = row.branch ?? ""
         branch.isHidden = row.branch == nil
-        let symbol = row.isArchived ? "archivebox" : row.isPinned ? "pin.fill" : nil
-        mark.image = symbol.flatMap {
-            NSImage(systemSymbolName: $0, accessibilityDescription: row.isArchived ? "Archived" : "Pinned")
-        }
-        mark.isHidden = symbol == nil
         agent.image = row.agent?.image
         agent.toolTip = row.agent?.detail
         agent.isHidden = row.agent == nil
