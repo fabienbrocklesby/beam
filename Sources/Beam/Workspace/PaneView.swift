@@ -3,7 +3,7 @@ import BeamCore
 
 /// One pane on screen: its terminal, a header while it shares the workspace
 /// with other panes, and an overlay that dims the terminal while another
-/// pane has focus.
+/// pane has focus, and the whole pane while it is being dragged.
 final class PaneView: NSView {
     enum Emphasis {
         /// The only pane on screen.
@@ -31,6 +31,12 @@ final class PaneView: NSView {
         }
     }
 
+    /// What the pane's agent last reported, for its header.
+    var agent: AgentState? {
+        get { header.agent }
+        set { header.agent = newValue }
+    }
+
     /// Whether the header shows, which it does while the workspace has
     /// other panes.
     var showsHeader = false {
@@ -51,6 +57,13 @@ final class PaneView: NSView {
 
     private let overlay: Overlay
     private let header: PaneHeaderView
+    /// Set while the pane is dragged by its header, so it reads as picked up.
+    fileprivate private(set) var isLifted = false {
+        didSet {
+            overlay.needsDisplay = true
+            layOutContent()
+        }
+    }
 
     init(id: Pane.ID, terminal: TerminalView, style: GhosttyApp.SplitStyle) {
         self.id = id
@@ -60,8 +73,10 @@ final class PaneView: NSView {
         super.init(frame: terminal.frame)
         header.isHidden = true
         addSubview(terminal)
-        addSubview(overlay)
         addSubview(header)
+        // Over the header too, which it dims along with the terminal while
+        // the pane is lifted. It lets every click through.
+        addSubview(overlay)
         overlay.pane = self
         layOutContent()
 
@@ -74,6 +89,7 @@ final class PaneView: NSView {
         }
         header.onToggleZoom = { [weak self] in self?.terminal.performBindingAction("toggle_split_zoom") }
         header.onClose = { [weak self] in self?.terminal.performBindingAction("close_surface") }
+        header.onDragging = { [weak self] dragging in self?.isLifted = dragging }
     }
 
     @available(*, unavailable)
@@ -93,7 +109,7 @@ final class PaneView: NSView {
             content = rest
         }
         terminal.frame = content
-        overlay.frame = content
+        overlay.frame = isLifted ? bounds : content
     }
 
     private func updateHeaderTitle() {
@@ -101,9 +117,13 @@ final class PaneView: NSView {
     }
 }
 
-/// Dims the terminal while another pane has focus, and lets every click
-/// through to it.
+/// Dims the terminal while another pane has focus, more strongly while the
+/// pane is lifted, and lets every click through.
 private final class Overlay: NSView {
+    /// How strongly a lifted pane is covered, unless unfocused panes already
+    /// are more.
+    private static let liftedOpacity = 0.6
+
     weak var pane: PaneView?
     var style: GhosttyApp.SplitStyle {
         didSet { needsDisplay = true }
@@ -125,9 +145,10 @@ private final class Overlay: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override func updateLayer() {
-        layer?.backgroundColor =
-            pane?.emphasis == .unfocused
-            ? style.unfocusedFill.withAlphaComponent(style.unfocusedFillOpacity).cgColor
-            : nil
+        let opacity =
+            pane?.isLifted == true
+            ? max(style.unfocusedFillOpacity, Self.liftedOpacity)
+            : pane?.emphasis == .unfocused ? style.unfocusedFillOpacity : 0
+        layer?.backgroundColor = opacity > 0 ? style.unfocusedFill.withAlphaComponent(opacity).cgColor : nil
     }
 }

@@ -26,7 +26,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let restore: SessionRestore
     /// What each pane's agent last reported.
     var activity = AgentActivity() {
-        didSet { notifier.withdraw { activity[$0]?.needsAttention == true } }
+        didSet {
+            notifier.withdraw { activity[$0]?.needsAttention == true }
+            for (id, view) in paneViews { view.agent = activity[id] }
+        }
     }
     let notifier: AgentNotifier
 
@@ -270,6 +273,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         terminal.onEvent = { [weak self] event in self?.handle(event, from: id) ?? false }
         let view = PaneView(id: id, terminal: terminal, style: style)
         view.directory = pane.workingDirectory
+        view.agent = activity[id]
         return view
     }
 

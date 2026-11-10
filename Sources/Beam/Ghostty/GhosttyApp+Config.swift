@@ -9,6 +9,8 @@ extension GhosttyApp {
     struct SplitStyle {
         /// The terminal's background, which pane chrome shares.
         var background: NSColor
+        /// A pane header's strip: the background a shade toward the text.
+        var headerBackground: NSColor
         /// How strongly `unfocusedFill` covers an unfocused pane, from 0 to 1.
         var unfocusedFillOpacity: Double
         var unfocusedFill: NSColor
@@ -33,8 +35,16 @@ extension GhosttyApp {
 
         var background = ghostty_config_color_s()
         _ = value(of: "background", into: &background)
-        var fill = background
-        if !value(of: "unfocused-split-fill", into: &fill) { fill = background }
+        let base = NSColor(background)
+        let isLight = base.brightnessComponent > 0.5
+
+        // Ghostty fills with the background, which on a light one only fades
+        // the text. A grey there also tints the pane, so the focused pane is
+        // the one left white.
+        var fill = ghostty_config_color_s()
+        let fillColor =
+            value(of: "unfocused-split-fill", into: &fill)
+            ? NSColor(fill) : isLight ? base.blended(withFraction: 0.12, of: .black) ?? base : base
 
         // Without an explicit colour, darken the background the way Ghostty does.
         var divider = ghostty_config_color_s()
@@ -42,14 +52,13 @@ extension GhosttyApp {
         if value(of: "split-divider-color", into: &divider) {
             dividerColor = NSColor(divider)
         } else {
-            let base = NSColor(background)
-            let isLight = base.brightnessComponent > 0.5
             dividerColor = base.blended(withFraction: isLight ? 0.08 : 0.4, of: .black) ?? base
         }
 
         return SplitStyle(
-            background: NSColor(background), unfocusedFillOpacity: 1 - opacity, unfocusedFill: NSColor(fill),
-            dividerColor: dividerColor)
+            background: base,
+            headerBackground: base.blended(withFraction: isLight ? 0.04 : 0.05, of: isLight ? .black : .white) ?? base,
+            unfocusedFillOpacity: 1 - opacity, unfocusedFill: fillColor, dividerColor: dividerColor)
     }
 
     /// The key the user's config binds to a keybinding `action` such as
