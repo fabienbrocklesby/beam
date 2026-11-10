@@ -81,6 +81,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window.contentViewController = split
         window.toolbar = launcher.toolbar
         window.toolbarStyle = .unifiedCompact
+        // The title bar takes the terminal's background, so it reads as the
+        // top of the terminal rather than a band across it.
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
+        window.backgroundColor = style.background
         window.setContentSize(NSSize(width: 1100, height: 700))
         window.center()
         window.setFrameAutosaveName("Main")
@@ -124,6 +129,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// switch between light and dark changed the theme.
     func applyConfig() {
         style = ghostty.splitStyle
+        window?.backgroundColor = style.background
         for view in workspaceViews.values { view.style = style }
         for view in paneViews.values { view.style = style }
     }
@@ -223,10 +229,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         sidebar.show(store.sidebar, branches: branches, agents: agents, selection: store.selection)
     }
 
-    /// The focused pane's title, as its shell or program sets it.
+    /// The selected workspace's name, with its focused pane's title below.
     func updateTitle() {
         guard let selected = store.selectedWorkspace else { return }
-        window?.title = focusedPane?.title ?? selected.name
+        window?.title = selected.name
+        window?.subtitle = focusedPane?.displayTitle ?? ""
     }
 
     private func makeWorkspaceView(_ id: Workspace.ID) -> WorkspaceView {

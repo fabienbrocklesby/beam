@@ -2,14 +2,15 @@ import AppKit
 import BeamCore
 
 /// The title bar: the sidebar toggle, then at the trailing end a button
-/// showing the Agents menu while an update waits, a button for each
-/// installed agent and one for a plain shell. Reports which entry was
-/// clicked; the window controller opens it.
+/// showing the Agents menu while an update waits, and a segmented control
+/// with a segment for each installed agent and one for a plain shell.
+/// Reports which entry was clicked; the window controller opens it.
 final class LauncherToolbar: NSObject, NSToolbarDelegate {
     private static let leading: [NSToolbarItem.Identifier] = [
         .toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace,
     ]
     private static let updatesIdentifier = NSToolbarItem.Identifier("Agent Updates")
+    private static let launchersIdentifier = NSToolbarItem.Identifier("Launchers")
 
     let toolbar = NSToolbar(identifier: "Main")
     var onLaunch: ((LauncherEntry) -> Void)?
@@ -17,6 +18,8 @@ final class LauncherToolbar: NSObject, NSToolbarDelegate {
     var updatesMenu = NSMenu()
     private var installed: Set<Agent> = []
     private var updates = 0
+    /// The entries the toolbar's launcher segments stand for, in order.
+    private var grouped: [LauncherEntry] = []
 
     override init() {
         super.init()
@@ -25,9 +28,8 @@ final class LauncherToolbar: NSObject, NSToolbarDelegate {
         toolbar.allowsUserCustomization = false
     }
 
-    /// Shows a button for each agent in `installed` and none for the rest.
-    /// Missing agents' items are removed rather than hidden, since hiding a
-    /// toolbar item needs macOS 15.
+    /// Shows a segment for each agent in `installed` and none for the rest,
+    /// by rebuilding the control.
     func show(installed: Set<Agent>) {
         self.installed = installed
         reconcile()
@@ -45,7 +47,7 @@ final class LauncherToolbar: NSObject, NSToolbarDelegate {
 
     private func reconcile() {
         let wanted = shownIdentifiers
-        guard toolbar.items.map(\.itemIdentifier) != wanted else { return }
+        guard toolbar.items.map(\.itemIdentifier) != wanted || grouped != shown else { return }
         while toolbar.items.count > Self.leading.count {
             toolbar.removeItem(at: toolbar.items.count - 1)
         }
@@ -54,23 +56,20 @@ final class LauncherToolbar: NSObject, NSToolbarDelegate {
         }
     }
 
-    private var shownIdentifiers: [NSToolbarItem.Identifier] {
-        let shown = LauncherEntry.all.filter { entry in
+    private var shown: [LauncherEntry] {
+        LauncherEntry.all.filter { entry in
             guard case .agent(let agent) = entry else { return true }
             return installed.contains(agent)
         }
-        return Self.leading + (updates > 0 ? [Self.updatesIdentifier] : []) + shown.map(Self.identifier)
     }
 
-    private static func identifier(_ entry: LauncherEntry) -> NSToolbarItem.Identifier {
-        NSToolbarItem.Identifier("Launch \(entry.name)")
+    private var shownIdentifiers: [NSToolbarItem.Identifier] {
+        Self.leading + (updates > 0 ? [Self.updatesIdentifier] : []) + [Self.launchersIdentifier]
     }
 
-    @objc private func launch(_ sender: NSToolbarItem) {
-        guard let entry = LauncherEntry.all.first(where: { Self.identifier($0) == sender.itemIdentifier }) else {
-            return
-        }
-        onLaunch?(entry)
+    @objc private func launch(_ sender: NSToolbarItemGroup) {
+        guard grouped.indices.contains(sender.selectedIndex) else { return }
+        onLaunch?(grouped[sender.selectedIndex])
     }
 
     // MARK: NSToolbarDelegate
@@ -80,7 +79,7 @@ final class LauncherToolbar: NSObject, NSToolbarDelegate {
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        Self.leading + [Self.updatesIdentifier] + LauncherEntry.all.map(Self.identifier)
+        Self.leading + [Self.updatesIdentifier, Self.launchersIdentifier]
     }
 
     func toolbar(
@@ -96,14 +95,15 @@ final class LauncherToolbar: NSObject, NSToolbarDelegate {
             item.toolTip = "Update the agent CLIs that have a newer version"
             return item
         }
-        guard let entry = LauncherEntry.all.first(where: { Self.identifier($0) == identifier }) else { return nil }
-        let item = NSToolbarItem(itemIdentifier: identifier)
-        item.title = entry.name
-        item.label = entry.name
-        item.isBordered = true
-        item.toolTip = "Open \(entry.name) in a new pane in this workspace's folder"
-        item.target = self
-        item.action = #selector(launch(_:))
-        return item
+        guard identifier == Self.launchersIdentifier else { return nil }
+        // One segmented control, so the launchers read as a single light
+        // capsule in the title bar rather than a row of capsules.
+        grouped = shown
+        let group = NSToolbarItemGroup(
+            itemIdentifier: identifier, titles: grouped.map(\.name), selectionMode: .momentary,
+            labels: grouped.map(\.name), target: self, action: #selector(launch(_:)))
+        group.label = "Open"
+        group.toolTip = "Open an agent or a shell in a new pane in this workspace's folder"
+        return group
     }
 }

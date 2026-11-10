@@ -14,7 +14,7 @@ final class PaneView: NSView {
 
     let id: Pane.ID
     let terminal: TerminalView
-    /// The terminal's latest title, for the window title.
+    /// The terminal's latest title.
     var title: String? {
         didSet { updateHeaderTitle() }
     }
@@ -112,8 +112,13 @@ final class PaneView: NSView {
         overlay.frame = isLifted ? bounds : content
     }
 
+    /// What names the pane in its header and the window's subtitle.
+    var displayTitle: String {
+        title ?? directory.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? ""
+    }
+
     private func updateHeaderTitle() {
-        header.title = title ?? directory.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? ""
+        header.title = displayTitle
     }
 }
 
