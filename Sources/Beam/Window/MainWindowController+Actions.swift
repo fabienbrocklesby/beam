@@ -217,16 +217,21 @@ extension MainWindowController: NSMenuItemValidation {
     }
 
     /// Every workspace the sidebar shows, each followed by its panes. A pane
-    /// whose terminal has not started yet goes by its directory, and one
-    /// whose agent has reported shows its state.
+    /// goes by its agent, else by its directory named from the workspace
+    /// (terminal titles are mostly that same path in full), and one whose
+    /// agent has reported shows its state.
     private func switcherItems() -> [SwitcherViewController.Item] {
         store.sidebar.flatMap { workspace in
             let folder = (workspace.folder as NSString).abbreviatingWithTildeInPath
             let detail = [folder, branches[workspace.id]].compactMap { $0 }.joined(separator: " · ")
             let panes = workspace.tree.panes.map { pane in
-                let directory = ((pane.workingDirectory ?? workspace.folder) as NSString).abbreviatingWithTildeInPath
+                let agent = activity.agent(in: pane.id) ?? pane.command.flatMap(Agent.init(command:))
+                let directory = pane.workingDirectory ?? workspace.folder
+                let title =
+                    agent?.name ?? workspace.relativeName(of: directory)
+                    ?? (directory as NSString).abbreviatingWithTildeInPath
                 return SwitcherViewController.Item(
-                    target: .pane(pane.id), title: paneViews[pane.id]?.title ?? directory, detail: workspace.name,
+                    target: .pane(pane.id), title: title, detail: workspace.name,
                     symbol: activity[pane.id]?.symbolName ?? "terminal")
             }
             let symbol = workspace.isArchived ? "archivebox" : workspace.isPinned ? "pin" : "folder"

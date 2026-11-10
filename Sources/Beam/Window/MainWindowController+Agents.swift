@@ -17,7 +17,7 @@ extension MainWindowController {
                 }
             }
         }
-        let needsUser = activity.apply(report.event, to: report.pane)
+        let needsUser = activity.apply(report.event, from: report.agent, to: report.pane)
         acknowledgeFocusedPane()
         showSidebar()
         // In front, the sidebar says it.

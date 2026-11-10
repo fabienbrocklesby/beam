@@ -16,17 +16,24 @@ final class SwitcherViewController: NSViewController, NSTextFieldDelegate, NSTab
         }
 
         let target: Target
-        /// What the query is matched against.
         let title: String
+        /// For a pane, its workspace's name.
         let detail: String
         /// An SF Symbol name.
         let symbol: String
+
+        /// What the query is matched against: the title, and a pane's
+        /// workspace after it, so typing a workspace's name finds its agents.
+        var searchText: String {
+            if case .pane = target { "\(title) \(detail)" } else { title }
+        }
     }
 
     var onPick: ((Item.Target) -> Void)?
     var onCancel: (() -> Void)?
 
     private static let width = 560.0
+    private static let cornerRadius = 12.0
     private static let fieldHeight = 48.0
     private static let rowHeight = 32.0
     private static let visibleRows = 9
@@ -51,21 +58,17 @@ final class SwitcherViewController: NSViewController, NSTextFieldDelegate, NSTab
     /// Frame layout, not constraints: the panel's height follows the result
     /// count while its top edge stays put, which `fitWindow` does by hand.
     override func loadView() {
-        let background = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: Self.width, height: Self.fieldHeight))
-        background.material = .popover
-        background.blendingMode = .behindWindow
-        background.state = .active
-        background.wantsLayer = true
-        background.layer?.cornerRadius = 12
-        background.layer?.masksToBounds = true
+        let content = EdgedView(frame: NSRect(x: 0, y: 0, width: Self.width, height: Self.fieldHeight))
+        content.cornerRadius = Self.cornerRadius
+        content.autoresizingMask = [.width, .height]
 
-        let glass = NSImageView(
+        let magnifier = NSImageView(
             image: NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil) ?? NSImage())
-        glass.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 17, weight: .regular)
-        glass.contentTintColor = .secondaryLabelColor
-        glass.frame = NSRect(x: 16, y: 0, width: 22, height: Self.fieldHeight)
-        glass.autoresizingMask = [.minYMargin]
-        background.addSubview(glass)
+        magnifier.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 17, weight: .regular)
+        magnifier.contentTintColor = .secondaryLabelColor
+        magnifier.frame = NSRect(x: 16, y: 0, width: 22, height: Self.fieldHeight)
+        magnifier.autoresizingMask = [.minYMargin]
+        content.addSubview(magnifier)
 
         field.isBordered = false
         field.drawsBackground = false
@@ -79,7 +82,7 @@ final class SwitcherViewController: NSViewController, NSTextFieldDelegate, NSTab
         field.frame = NSRect(
             x: 46, y: (Self.fieldHeight - fieldLine) / 2, width: Self.width - 46 - 16, height: fieldLine)
         field.autoresizingMask = [.width, .minYMargin]
-        background.addSubview(field)
+        content.addSubview(field)
 
         tableView.headerView = nil
         tableView.style = .inset
@@ -99,9 +102,28 @@ final class SwitcherViewController: NSViewController, NSTextFieldDelegate, NSTab
         scrollView.autohidesScrollers = true
         scrollView.frame = NSRect(x: 0, y: 0, width: Self.width, height: 0)
         scrollView.autoresizingMask = [.width, .height]
-        background.addSubview(scrollView)
+        content.addSubview(scrollView)
 
-        view = background
+        view = Self.background(holding: content)
+    }
+
+    /// Liquid Glass where the system has it, else the material popovers use.
+    private static func background(holding content: NSView) -> NSView {
+        if #available(macOS 26, *) {
+            let glass = NSGlassEffectView(frame: content.frame)
+            glass.cornerRadius = cornerRadius
+            glass.contentView = content
+            return glass
+        }
+        let material = NSVisualEffectView(frame: content.frame)
+        material.material = .popover
+        material.blendingMode = .behindWindow
+        material.state = .active
+        material.wantsLayer = true
+        material.layer?.cornerRadius = cornerRadius
+        material.layer?.masksToBounds = true
+        material.addSubview(content)
+        return material
     }
 
     override func viewWillAppear() {
@@ -121,7 +143,7 @@ final class SwitcherViewController: NSViewController, NSTextFieldDelegate, NSTab
     }
 
     private func filter() {
-        results = FuzzyMatch.rank(items, by: field.stringValue) { $0.title }
+        results = FuzzyMatch.rank(items, by: field.stringValue) { $0.searchText }
         tableView.reloadData()
         select(0)
         fitWindow()
@@ -189,6 +211,32 @@ final class SwitcherViewController: NSViewController, NSTextFieldDelegate, NSTab
 
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
         EmphasizedRowView()
+    }
+}
+
+/// The panel's content, edged with a hairline so the panel stands off a
+/// terminal of any colour behind it.
+private final class EdgedView: NSView {
+    var cornerRadius = 0.0
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        return nil
+    }
+
+    override var wantsUpdateLayer: Bool { true }
+
+    // Runs with this view's appearance current, so the separator colour
+    // resolves for light or dark mode.
+    override func updateLayer() {
+        layer?.cornerRadius = cornerRadius
+        layer?.borderWidth = 1
+        layer?.borderColor = NSColor.separatorColor.cgColor
     }
 }
 

@@ -28,11 +28,11 @@ struct AgentReportsTests {
             var everything = AgentActivity()
             var reports = AgentReports()
             for event in history {
-                everything.apply(event, to: pane)
+                everything.apply(event, from: .claude, to: pane)
                 reports.record(report(event))
             }
             var replayed = AgentActivity()
-            for kept in reports.latest(for: pane) { replayed.apply(kept.event, to: pane) }
+            for kept in reports.latest(for: pane) { replayed.apply(kept.event, from: kept.agent, to: pane) }
             #expect(replayed == everything, "\(history)")
         }
     }

@@ -3,8 +3,9 @@
 ///
 /// Only two reports per pane are kept: the latest `started`, which names the
 /// conversation a relaunch after a reboot resumes, and the report of the
-/// state still in effect. Applied in order to a fresh `AgentActivity`, they
-/// leave it where every report so far would have.
+/// state still in effect, an `ended` once the session is over. Applied in
+/// order to a fresh `AgentActivity`, they leave it where every report so far
+/// would have.
 public struct AgentReports: Equatable, Sendable {
     private var started: [Pane.ID: AgentReport] = [:]
     private var states: [Pane.ID: AgentReport] = [:]
@@ -17,10 +18,8 @@ public struct AgentReports: Equatable, Sendable {
         case .started:
             started[pane] = report
             states[pane] = nil
-        case .working, .waiting, .done:
+        case .working, .waiting, .done, .ended:
             states[pane] = report
-        case .ended:
-            states[pane] = nil
         case .idle:
             // As in AgentActivity: it only ends a turn still marked working.
             if states[pane]?.event == .working { states[pane] = nil }

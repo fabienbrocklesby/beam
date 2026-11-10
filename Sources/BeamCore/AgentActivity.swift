@@ -1,17 +1,22 @@
-/// The agent state of every pane whose agent has reported one. Not saved:
-/// agents report afresh when they start again.
+/// The agent state of every pane whose agent has reported one, and which
+/// agent that is. Not saved: agents report afresh when they start again.
 public struct AgentActivity: Equatable, Sendable {
     private var states: [Pane.ID: AgentState] = [:]
+    private var agents: [Pane.ID: Agent] = [:]
 
     public init() {}
 
     public subscript(pane: Pane.ID) -> AgentState? { states[pane] }
 
-    /// Applies what `pane`'s agent reported, and says whether the pane now
-    /// needs the user when it did not before: the moment to tell them.
+    /// The agent that last reported from `pane`, until its session ends.
+    public func agent(in pane: Pane.ID) -> Agent? { agents[pane] }
+
+    /// Applies what `agent` reported from `pane`, and says whether the pane
+    /// now needs the user when it did not before: the moment to tell them.
     @discardableResult
-    public mutating func apply(_ event: AgentReport.Event, to pane: Pane.ID) -> Bool {
+    public mutating func apply(_ event: AgentReport.Event, from agent: Agent, to pane: Pane.ID) -> Bool {
         let neededAttention = states[pane]?.needsAttention == true
+        agents[pane] = event == .ended ? nil : agent
         switch event {
         case .started, .ended:
             states[pane] = nil
@@ -36,6 +41,7 @@ public struct AgentActivity: Equatable, Sendable {
     /// Drops what `pane` reported: its agent has exited, or the pane is gone.
     public mutating func forget(_ pane: Pane.ID) {
         states[pane] = nil
+        agents[pane] = nil
     }
 
     /// The most urgent state among `panes`, the first of them on a tie.

@@ -47,6 +47,18 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
         reopen()
     }
 
+    /// `directory` named from the workspace: its name for its own folder,
+    /// the path from its name for a folder inside it (`beam/Sources`), and
+    /// nil for a folder outside it.
+    public func relativeName(of directory: String) -> String? {
+        let folder = (folder as NSString).pathComponents
+        // Standardized as the folder was, since a shell may report
+        // `/private/tmp` for `/tmp` or end the path with a slash.
+        let path = ((directory as NSString).standardizingPath as NSString).pathComponents
+        guard path.starts(with: folder) else { return nil }
+        return ([name] + path.dropFirst(folder.count)).joined(separator: "/")
+    }
+
     /// Starts a shell in the folder if no pane is open.
     mutating func reopen() {
         guard tree.isEmpty else { return }
