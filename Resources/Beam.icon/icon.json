@@ -1,0 +1,77 @@
+{
+  "fill": {
+    "solid": "srgb:0.98431,0.98824,0.99608,1.00000"
+  },
+  "fill-specializations": [
+    {
+      "appearance": "dark",
+      "value": {
+        "solid": "srgb:0.04706,0.05098,0.07059,1.00000"
+      }
+    }
+  ],
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name-specializations": [
+            {
+              "value": "chevron-light.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "chevron-dark.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "chevron-dark.svg"
+            }
+          ],
+          "name": "chevron",
+          "glass": true
+        }
+      ],
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.25
+      },
+      "specular": true
+    },
+    {
+      "layers": [
+        {
+          "image-name-specializations": [
+            {
+              "value": "back-light.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "back-dark.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "back-dark.svg"
+            }
+          ],
+          "name": "back",
+          "glass": false
+        }
+      ],
+      "shadow": {
+        "kind": "none",
+        "opacity": 0
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}

@@ -16,6 +16,26 @@ cp "$bin_dir/BeamDaemon" "$app/Contents/Helpers/beamd"
 cp "$bin_dir/BeamAttach" "$app/Contents/Helpers/beam-attach"
 cp "$root/Resources/Info.plist" "$app/Contents/Info.plist"
 cp "$root/Resources/defaults.ghostty" "$app/Contents/Resources/defaults.ghostty"
+minos="$(plutil -extract LSMinimumSystemVersion raw "$app/Contents/Info.plist")"
+
+# The icon is an Icon Composer document. actool compiles it to Assets.car (the
+# layered icon for macOS 26 and later, rendered sizes for earlier systems) and
+# Beam.icns, and lists the keys that name them in a partial Info.plist.
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+if ! actool "$root/Resources/Beam.icon" --compile "$app/Contents/Resources" \
+    --platform macosx --minimum-deployment-target "$minos" --app-icon Beam \
+    --output-partial-info-plist "$work/icon.plist" \
+    --output-format human-readable-text >"$work/actool.txt"; then
+    cat "$work/actool.txt" >&2
+    exit 1
+fi
+/usr/libexec/PlistBuddy -c "Merge $work/icon.plist" "$app/Contents/Info.plist" >/dev/null
+# actool succeeds with an empty partial plist when the document is missing.
+if ! plutil -extract CFBundleIconName raw "$app/Contents/Info.plist" >/dev/null 2>&1; then
+    echo "error: actool compiled no app icon from Resources/Beam.icon" >&2
+    exit 1
+fi
 
 # macOS draws an app with the design of the SDK its binary says it was built
 # against. Swift Build writes the deployment target there instead
@@ -27,7 +47,6 @@ if vtool -show-build "$app/Contents/MacOS/Beam" | grep -qx " *sdk $sdk"; then
     echo "swift-build#1887 looks fixed: remove the vtool step from scripts/bundle.sh" >&2
     exit 1
 fi
-minos="$(plutil -extract LSMinimumSystemVersion raw "$app/Contents/Info.plist")"
 vtool -set-build-version macos "$minos" "$sdk" -replace \
     -output "$app/Contents/MacOS/Beam" "$app/Contents/MacOS/Beam" 2>/dev/null
 

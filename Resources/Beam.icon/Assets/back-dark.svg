@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#262A36"/>
+      <stop offset="1" stop-color="#0C0D12"/>
+    </linearGradient>
+    <linearGradient id="cone" x1="470" y1="0" x2="1090" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D8F7FF" stop-opacity="1"/>
+      <stop offset="0.35" stop-color="#6FD8FF" stop-opacity="0.8"/>
+      <stop offset="0.75" stop-color="#6F7DFF" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#6F7DFF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="spill" cx="470" cy="512" r="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5FC8FF" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#5FC8FF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#spill)"/>
+  <path d="M470 512 L1090 209.6 L1090 814.4 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 228.7 L1090 795.3 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 247.4 L1090 776.6 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 265.7 L1090 758.3 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 283.6 L1090 740.4 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 301.2 L1090 722.8 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 318.5 L1090 705.5 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 335.5 L1090 688.5 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 352.3 L1090 671.7 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 368.9 L1090 655.1 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 385.2 L1090 638.8 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 401.4 L1090 622.6 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 417.5 L1090 606.5 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 433.4 L1090 590.6 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 449.3 L1090 574.7 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 465.0 L1090 559.0 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 480.7 L1090 543.3 Z" fill="url(#cone)" opacity="0.0722"/>
+    <path d="M470 512 L1090 496.4 L1090 527.6 Z" fill="url(#cone)" opacity="0.0722"/>
+<path d="M470 504 L1090 488 L1090 536 L470 520 Z" fill="url(#cone)" opacity="0.75"/>
+</svg>
