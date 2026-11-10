@@ -1,3 +1,10 @@
 # Beam's defaults. The user's Ghostty config and Beam's own settings file load
 # after this one, so any setting there wins.
 theme = light:Apple System Colors Light,dark:Apple System Colors
+
+# Room between the text and the pane's edges, so it does not sit on the
+# dividers and headers. Balancing spreads what is left over by the cell grid
+# around all four edges instead of leaving it at the bottom right.
+window-padding-x = 10
+window-padding-y = 6
+window-padding-balance = true
