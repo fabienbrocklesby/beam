@@ -13,7 +13,9 @@ import Foundation
 
 /// The window, in points. The background art is drawn for this geometry.
 enum Layout {
-    static let windowBounds = "{{200, 120}, {640, 400}}"
+    /// The whole window, title bar included: 32 points tall on current macOS,
+    /// which leaves the art's 640x400 for the content below it.
+    static let windowBounds = "{{200, 120}, {640, 432}}"
     static let iconSize = 128.0
     static let textSize = 13.0
     static let background = ".background/background.tiff"
@@ -240,10 +242,14 @@ func run() throws {
         "ShowTabView": false, "ContainerShowSidebar": false, "PreviewPaneVisibility": false,
         "SidebarWidth": 180,
     ]
+    // Finder ignores the whole record, icon size included, when any key it
+    // writes itself is missing, so the colour is here although the picture
+    // covers it.
     let iconView: [String: Any] = [
         "viewOptionsVersion": 1,
         "backgroundType": 2,  // a picture
         "backgroundImageAlias": try alias(to: Layout.background, onVolume: volume),
+        "backgroundColorRed": 1.0, "backgroundColorGreen": 1.0, "backgroundColorBlue": 1.0,
         "iconSize": Layout.iconSize, "textSize": Layout.textSize, "labelOnBottom": true,
         "arrangeBy": "none", "gridSpacing": 100.0, "gridOffsetX": 0.0, "gridOffsetY": 0.0,
         "showIconPreview": false, "showItemInfo": false, "scrollPositionX": 0.0, "scrollPositionY": 0.0,
