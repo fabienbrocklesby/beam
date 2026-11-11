@@ -38,6 +38,9 @@ extension MainWindowController: NSMenuItemValidation {
             installedAgents.refresh()
             if updatePanes.remove(pane) != nil { updates.updateFinished() }
 
+        case .openLink(let text):
+            openLink(text, from: pane)
+
         case .closeRequested(let processAlive):
             confirmClose("Close this pane?", needed: processAlive) { [weak self] in
                 self?.update { $0.closePane(pane) }

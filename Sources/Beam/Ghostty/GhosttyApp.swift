@@ -251,6 +251,11 @@ final class GhosttyApp {
         case GHOSTTY_ACTION_COMMAND_FINISHED:
             return view?.send(.commandFinished) ?? false
 
+        case GHOSTTY_ACTION_OPEN_URL:
+            guard let url = payload.open_url.url else { return false }
+            let bytes = UnsafeRawBufferPointer(start: url, count: Int(payload.open_url.len))
+            return view?.send(.openLink(String(decoding: bytes, as: UTF8.self))) ?? false
+
         case GHOSTTY_ACTION_CELL_SIZE:
             guard let view else { return false }
             view.cellSize = NSSize(
