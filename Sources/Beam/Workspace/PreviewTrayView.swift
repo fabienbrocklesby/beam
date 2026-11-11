@@ -1,4 +1,5 @@
 import AppKit
+import BeamCore
 import QuickLookThumbnailing
 import UniformTypeIdentifiers
 import os
@@ -22,7 +23,9 @@ final class PreviewTrayView: NSView {
     /// Whether `url` gets a thumbnail in the tray. Looks the type up in
     /// Launch Services, so keep it off the main thread.
     nonisolated static func canPreview(_ url: URL) -> Bool {
-        guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
+        guard !FileMention.isTypeScript(url.lastPathComponent),
+            let type = UTType(filenameExtension: url.pathExtension)
+        else { return false }
         return previewable.contains { type.conforms(to: $0) }
     }
 

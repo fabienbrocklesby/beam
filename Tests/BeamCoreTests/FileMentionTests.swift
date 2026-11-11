@@ -130,4 +130,15 @@ struct FileMentionTests {
             """
         #expect(FileMention.names(inPatch: patch) == ["diagram.svg", "src/a.swift", "src/b.swift"])
     }
+
+    /// macOS files `.ts` and `.mts` as video, so the tray asks before
+    /// trusting the type.
+    @Test func typeScriptIsToldApartFromVideo() {
+        #expect(FileMention.isTypeScript("src/app.ts"))
+        #expect(FileMention.isTypeScript("/r/vite.config.mts"))
+        #expect(FileMention.isTypeScript("INDEX.TS"))
+        #expect(!FileMention.isTypeScript("clip.mp4"))
+        #expect(!FileMention.isTypeScript("shot.png"))
+        #expect(!FileMention.isTypeScript("ts"))
+    }
 }

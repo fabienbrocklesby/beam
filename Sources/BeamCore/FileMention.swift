@@ -48,6 +48,12 @@ public enum FileMention: Equatable, Sendable {
         return webSchemes.first(where: lowercased.hasPrefix)
     }
 
+    /// Whether `path` is TypeScript by an extension macOS files as MPEG
+    /// transport stream video, which an agent almost always means as source.
+    public static func isTypeScript(_ path: String) -> Bool {
+        ["ts", "mts"].contains(URL(filePath: path).pathExtension.lowercased())
+    }
+
     /// `path` without a trailing `:line`, `:line:column` or a lone colon.
     private static func droppingLocation(_ path: Substring) -> Substring {
         var path = path
