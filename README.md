@@ -32,6 +32,11 @@ back when Beam opens again.
   through their own hooks, keyed by pane rather than guessed from the screen.
   The sidebar marks the panes that need you, Cmd+Shift+U jumps to the next
   one, and a notification arrives while Beam is in the background.
+- **Files agents mention.** Cmd+click a path in any pane to open it; relative
+  paths resolve from the pane's folder. Turn on View > Show File Previews and
+  the images, PDFs and documents Claude Code or Codex names in a reply show as
+  thumbnails under its pane, even when it gives only the file name. Click one
+  for Quick Look, or drag it out.
 - **Sessions survive quit.** A small background process, `beamd`, owns every
   pane's shell. Quit Beam, or have it crash, and shells and agents keep
   running; open it again and each pane is back with the same process, screen
