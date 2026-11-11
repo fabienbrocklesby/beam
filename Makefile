@@ -1,6 +1,6 @@
-.PHONY: ghostty app debug run format lint test check bench launch clean
+.PHONY: ghostty app debug run format lint test check bench launch dmg clean
 
-SWIFT_PATHS = Package.swift Sources Tests
+SWIFT_PATHS = Package.swift Sources Tests scripts
 
 # libghostty from the pinned submodule. Slow (minutes); only needed after a bump.
 ghostty:
@@ -35,6 +35,10 @@ bench: app
 
 launch: app
 	scripts/launch.sh
+
+# build/Beam-<version>.dmg: the app and an Applications link, laid out.
+dmg: app
+	scripts/dmg.sh
 
 clean:
 	rm -rf .build build
