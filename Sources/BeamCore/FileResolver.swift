@@ -35,6 +35,19 @@ public struct FileResolver: Sendable {
         return candidates.lazy.compactMap(existing).first
     }
 
+    /// The files `names` name, as `FileMention` reads them, each once in
+    /// the order named. Web addresses and names of nothing are left out.
+    public func paths(for names: [String], directory: String?, touched: [String], home: String) -> [String] {
+        var seen = Set<String>()
+        return names.compactMap { name in
+            guard case .file(let path) = FileMention(name, home: home),
+                let found = self.path(for: path, directory: directory, touched: touched),
+                seen.insert(found).inserted
+            else { return nil }
+            return found
+        }
+    }
+
     /// `path` without `.` and `..`, if it exists.
     private func existing(_ path: String) -> String? {
         let standardized = URL(filePath: path, directoryHint: .notDirectory).standardized.path(percentEncoded: false)

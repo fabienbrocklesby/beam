@@ -50,4 +50,21 @@ struct StateFileTests {
         try JSONSerialization.data(withJSONObject: json).write(to: file.url)
         #expect(throws: StateFile.UnsupportedVersion(version: 2)) { try file.load() }
     }
+
+    /// A file Beam 0.1 wrote, before file previews could be turned on.
+    @Test func aFileFromBeamZeroPointOneLoadsWithPreviewsOff() throws {
+        let store = makeStore()
+        try file.save(store)
+        var json = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: file.url)) as? [String: Any])
+        var saved = try #require(json["store"] as? [String: Any])
+        #expect(saved.removeValue(forKey: "showsPreviews") as? Bool == false)
+        json["store"] = saved
+        try JSONSerialization.data(withJSONObject: json).write(to: file.url)
+        #expect(try file.load() == store)
+
+        var changed = store
+        changed.showsPreviews = true
+        try file.save(changed)
+        #expect(try file.load()?.showsPreviews == true)
+    }
 }

@@ -58,4 +58,76 @@ struct FileMentionTests {
         #expect(mention(":12") == nil)
         #expect(mention("https://") == nil)
     }
+
+    // MARK: Finding mentions in text
+
+    @Test func aMessageNamesFilesInCodeSpansLinksAndWords() {
+        let message = """
+            Saved the screenshot as `shot-dark.png`, with ![the chart](out/chart.svg) beside it.
+            The report is at /tmp/session/report.pdf.
+            """
+        #expect(FileMention.names(in: message) == ["shot-dark.png", "out/chart.svg", "/tmp/session/report.pdf"])
+    }
+
+    @Test func punctuationAroundANameIsNotPartOfIt() {
+        #expect(
+            FileMention.names(in: "(see **shot.png**), then \"notes.md\"; or 'a.pdf'!") == [
+                "shot.png", "notes.md", "a.pdf",
+            ])
+        #expect(FileMention.names(in: "Fixed main.swift:12: a crash.") == ["main.swift:12"])
+    }
+
+    /// A name with a space only comes through whole in a code span, which
+    /// may as well be a command, so its words count too. The resolver drops
+    /// whichever names nothing.
+    @Test func aCodeSpanWithASpaceIsANameAndSoAreItsWords() {
+        #expect(FileMention.names(in: "Open `Screen Shot 1.png` now") == ["Screen Shot 1.png", "1.png"])
+        #expect(FileMention.names(in: "Run `open shot.png` to see it") == ["open shot.png", "shot.png"])
+    }
+
+    @Test func wordsThatCannotBeFilesAreLeftOut() {
+        #expect(FileMention.names(in: "Done. All tests pass, version 0.1.0, run `make check`.") == [])
+        #expect(FileMention.names(in: "See https://example.com/shot.png and mailto:me@example.com") == [])
+    }
+
+    /// Code blocks are code, not names.
+    @Test func aCodeBlockIsSkipped() {
+        let message = """
+            Added it:
+            ```swift
+            let url = folder.appendingPathComponent("x.png")
+            ```
+            Wrote `x.png`.
+            """
+        #expect(FileMention.names(in: message) == ["x.png"])
+    }
+
+    @Test func eachNameComesOnceInTheOrderFirstWritten() {
+        #expect(FileMention.names(in: "a.png, b.png and a.png again") == ["a.png", "b.png"])
+    }
+
+    @Test func aShellCommandNamesTheFilesItWrites() {
+        #expect(
+            FileMention.names(in: "mkdir -p shots && printf 'x' > shots/pic.png") == ["shots/pic.png"])
+        #expect(
+            FileMention.names(in: "screencapture -x -l 6539 /tmp/s/shot.png 2>/dev/null; cp a.txt --to=out/b.txt")
+                == ["/tmp/s/shot.png", "/dev/null", "a.txt", "out/b.txt"])
+    }
+
+    /// Codex edits files with `apply_patch`, whose input names them.
+    @Test func aPatchNamesTheFilesItAddsUpdatesAndMoves() {
+        let patch = """
+            *** Begin Patch
+            *** Add File: diagram.svg
+            +<svg xmlns="http://www.w3.org/2000/svg"/>
+            *** Update File: src/a.swift
+            *** Move to: src/b.swift
+            @@
+            -old
+            +new
+            *** Delete File: old.txt
+            *** End Patch
+            """
+        #expect(FileMention.names(inPatch: patch) == ["diagram.svg", "src/a.swift", "src/b.swift"])
+    }
 }

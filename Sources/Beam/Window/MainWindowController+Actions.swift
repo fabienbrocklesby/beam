@@ -301,6 +301,9 @@ extension MainWindowController: NSMenuItemValidation {
         case #selector(toggleShowsArchived(_:)):
             menuItem.state = store.showsArchived ? .on : .off
             return true
+        case #selector(toggleShowsPreviews(_:)):
+            menuItem.state = store.showsPreviews ? .on : .off
+            return true
         default:
             return true
         }

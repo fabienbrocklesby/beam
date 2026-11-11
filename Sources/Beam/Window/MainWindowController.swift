@@ -32,6 +32,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
     }
     let notifier: AgentNotifier
+    /// What each pane's agent has touched in the turn it is on.
+    var turnFiles = TurnFiles(home: NSHomeDirectory())
+    /// The files each pane's tray shows, from its agent's last reply.
+    var previews: [Pane.ID: [URL]] = [:]
 
     private let sidebar = SidebarViewController()
     private let launcher = LauncherToolbar()
@@ -174,6 +178,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             view.removeFromSuperview()
             paneViews[id] = nil
             activity.forget(id)
+            turnFiles.forget(id)
+            previews[id] = nil
         }
         for (id, view) in workspaceViews where store.workspace(id) == nil {
             view.removeFromSuperview()
@@ -285,6 +291,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let view = PaneView(id: id, terminal: terminal, style: style)
         view.directory = pane.workingDirectory
         view.agent = activity[id]
+        view.previews = previews[id] ?? []
+        view.onClosePreviews = { [weak self] in self?.previews[id] = nil }
         return view
     }
 

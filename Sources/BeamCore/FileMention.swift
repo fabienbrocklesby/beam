@@ -18,15 +18,14 @@ public enum FileMention: Equatable, Sendable {
 
     /// Nil when `text` names nothing.
     public init?(_ text: String, home: String) {
-        let lowercased = text.lowercased()
-        if let scheme = Self.webSchemes.first(where: lowercased.hasPrefix) {
+        if let scheme = Self.webScheme(of: text) {
             guard text.count > scheme.count, let url = URL(string: text) else { return nil }
             self = .web(url)
             return
         }
 
         var path = Substring(text)
-        if lowercased.hasPrefix("file:") {
+        if text.lowercased().hasPrefix("file:") {
             path = Substring(URL(string: text)?.path(percentEncoded: false) ?? String(text.dropFirst(5)))
         }
         path = Self.droppingLocation(path)
@@ -39,6 +38,14 @@ public enum FileMention: Equatable, Sendable {
         }
         guard !path.isEmpty else { return nil }
         self = .file(String(path))
+    }
+
+    /// Whether `text` starts with one of the web schemes Ghostty links.
+    static func isWeb(_ text: some StringProtocol) -> Bool { webScheme(of: text) != nil }
+
+    private static func webScheme(of text: some StringProtocol) -> String? {
+        let lowercased = text.prefix(12).lowercased()
+        return webSchemes.first(where: lowercased.hasPrefix)
     }
 
     /// `path` without a trailing `:line`, `:line:column` or a lone colon.

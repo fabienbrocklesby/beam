@@ -11,8 +11,24 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
     public private(set) var workspaces: [Workspace] = []
     public private(set) var selection: Workspace.ID?
     public var showsArchived = false
+    /// Whether panes show a tray of the files an agent's reply named. Off
+    /// until the user turns it on.
+    public var showsPreviews = false
 
     public init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case workspaces, selection, showsArchived, showsPreviews
+    }
+
+    /// Files from Beam 0.1 have no `showsPreviews`.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        workspaces = try container.decode([Workspace].self, forKey: .workspaces)
+        selection = try container.decodeIfPresent(Workspace.ID.self, forKey: .selection)
+        showsArchived = try container.decode(Bool.self, forKey: .showsArchived)
+        showsPreviews = try container.decodeIfPresent(Bool.self, forKey: .showsPreviews) ?? false
+    }
 
     public func workspace(_ id: Workspace.ID) -> Workspace? {
         workspaces.first { $0.id == id }

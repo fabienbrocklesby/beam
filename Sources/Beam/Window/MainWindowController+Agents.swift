@@ -17,6 +17,7 @@ extension MainWindowController {
                 }
             }
         }
+        if let lookup = turnFiles.record(report) { showPreviews(of: lookup, in: report.pane) }
         let needsUser = activity.apply(report.event, from: report.agent, to: report.pane)
         acknowledgeFocusedPane()
         showSidebar()

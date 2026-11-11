@@ -77,4 +77,16 @@ struct FileResolverTests {
         let resolver = resolver([repository + "/README.md"])
         #expect(resolver.path(for: "README.md", directory: nil, touched: []) == nil)
     }
+
+    @Test func namesResolveEachOnceInOrderWithoutWebAddressesOrMissingFiles() {
+        let shot = scratchpad + "/shot.png"
+        let resolver = resolver([shot, "/Users/me/a.png", repository + "/Sources/main.swift"])
+        let names = [
+            "shot.png", "https://example.com/a.png", "~/a.png", "Sources/main.swift:12", shot, "missing.png",
+        ]
+        #expect(
+            resolver.paths(for: names, directory: repository, touched: [shot], home: "/Users/me") == [
+                shot, "/Users/me/a.png", repository + "/Sources/main.swift",
+            ])
+    }
 }

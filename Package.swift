@@ -41,7 +41,9 @@ let package = Package(
                 .linkedFramework("CoreVideo"),
                 .linkedFramework("IOSurface"),
                 .linkedFramework("Metal"),
+                .linkedFramework("Quartz"),
                 .linkedFramework("QuartzCore"),
+                .linkedFramework("QuickLookThumbnailing"),
                 .linkedFramework("UniformTypeIdentifiers"),
                 .linkedLibrary("c++"),
             ]

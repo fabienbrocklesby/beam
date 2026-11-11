@@ -2,17 +2,49 @@ import Foundation
 
 /// Reads the JSON an agent CLI passes its hooks on stdin. Claude Code and
 /// Codex share the event names and fields Beam reads; only Claude Code sends
-/// `Notification`, `PostToolUseFailure` and `StopFailure`.
+/// `Notification`, `PostToolUseFailure` and `StopFailure`. Their tools
+/// differ: Codex edits files with `apply_patch`, whose patch names them.
 public enum AgentHook {
     private struct Payload: Decodable {
         let hookEventName: String
         let sessionId: String?
         let source: String?
+        let cwd: String?
         let toolName: String?
+        let toolInput: ToolInput?
         let message: String?
         let notificationType: String?
         let lastAssistantMessage: String?
         let error: String?
+    }
+
+    /// The fields of a tool's input that name files. Each tool has its own
+    /// shape, so a field of another type reads as absent rather than failing
+    /// the payload and the report with it.
+    private struct ToolInput: Decodable {
+        var filePath: String?
+        var notebookPath: String?
+        var command: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case filePath, notebookPath, command
+        }
+
+        init(from decoder: any Decoder) {
+            let container = try? decoder.container(keyedBy: CodingKeys.self)
+            filePath = try? container?.decodeIfPresent(String.self, forKey: .filePath)
+            notebookPath = try? container?.decodeIfPresent(String.self, forKey: .notebookPath)
+            command = try? container?.decodeIfPresent(String.self, forKey: .command)
+        }
+
+        /// A shell command's words, or the files an `apply_patch` patch edits.
+        func names(tool: String?) -> [String] {
+            var names = [filePath, notebookPath].compactMap(\.self)
+            if let command {
+                names += tool == "apply_patch" ? FileMention.names(inPatch: command) : FileMention.names(in: command)
+            }
+            return names
+        }
     }
 
     /// Notification types that mean the agent is blocked on the user.
@@ -22,14 +54,22 @@ public enum AgentHook {
 
     /// Longest message a report carries: enough for a notification's body.
     private static let messageLimit = 200
+    /// Most files a report names: plenty for a reply, whatever the size of
+    /// the payload.
+    private static let filesLimit = 32
 
-    /// What `payload` reports, or nil for events that change nothing and for
-    /// input that is not a hook payload.
-    public static func event(from payload: Data, agent: Agent) -> AgentReport.Event? {
+    /// What `payload` from `agent` in `pane` reports, or nil for events that
+    /// change nothing and for input that is not a hook payload.
+    public static func report(from payload: Data, pane: Pane.ID, agent: Agent) -> AgentReport? {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        guard let payload = try? decoder.decode(Payload.self, from: payload) else { return nil }
+        guard let payload = try? decoder.decode(Payload.self, from: payload), let event = event(of: payload) else {
+            return nil
+        }
+        return AgentReport(pane: pane, agent: agent, event: event, files: files(of: payload))
+    }
 
+    private static func event(of payload: Payload) -> AgentReport.Event? {
         switch payload.hookEventName {
         case "SessionStart":
             // Compacting keeps the session, often in the middle of a turn.
@@ -54,6 +94,18 @@ public enum AgentHook {
         default:
             return nil
         }
+    }
+
+    /// What a tool result's input or a finished turn's reply named.
+    private static func files(of payload: Payload) -> AgentReport.Files? {
+        let names: [String]
+        switch payload.hookEventName {
+        case "PostToolUse": names = payload.toolInput?.names(tool: payload.toolName) ?? []
+        case "Stop": names = payload.lastAssistantMessage.map(FileMention.names(in:)) ?? []
+        default: names = []
+        }
+        guard !names.isEmpty else { return nil }
+        return AgentReport.Files(directory: payload.cwd, names: Array(names.prefix(filesLimit)))
     }
 
     /// `session` when it is made only of what session IDs are made of, so it

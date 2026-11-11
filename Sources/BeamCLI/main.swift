@@ -23,8 +23,7 @@ guard let uuid = environment["BEAM_PANE_ID"].flatMap(UUID.init(uuidString:)),
 else { exit(EXIT_SUCCESS) }
 
 let payload = FileHandle.standardInput.readDataToEndOfFile()
-if let event = AgentHook.event(from: payload, agent: agent) {
+if let report = AgentHook.report(from: payload, pane: Pane.ID(uuid: uuid), agent: agent) {
     // Fails only when beamd has gone, and the session with it.
-    let report = AgentReport(pane: Pane.ID(uuid: uuid), agent: agent, event: event)
     try? DaemonSocket.send(DaemonFrame(.report, encoding: report), to: socket)
 }

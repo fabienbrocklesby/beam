@@ -15,13 +15,31 @@ public struct AgentReport: Codable, Equatable, Sendable {
         case ended
     }
 
+    /// Paths a hook's payload named, as written: often partial, for Beam
+    /// to find on disk (see `TurnFiles` and `FileResolver`).
+    public struct Files: Codable, Equatable, Sendable {
+        /// The hook's working directory, where relative names start.
+        public var directory: String?
+        public var names: [String]
+
+        public init(directory: String?, names: [String]) {
+            self.directory = directory
+            self.names = names
+        }
+    }
+
     public let pane: Pane.ID
     public let agent: Agent
     public let event: Event
+    /// The files a tool result's input or a finished turn's reply named.
+    /// Optional in the JSON, so a helper and a beamd of different versions
+    /// still understand each other.
+    public let files: Files?
 
-    public init(pane: Pane.ID, agent: Agent, event: Event) {
+    public init(pane: Pane.ID, agent: Agent, event: Event, files: Files? = nil) {
         self.pane = pane
         self.agent = agent
         self.event = event
+        self.files = files
     }
 }

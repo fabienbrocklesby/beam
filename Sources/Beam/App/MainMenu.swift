@@ -76,6 +76,9 @@ enum MainMenu {
         view.addItem(
             withTitle: "Show Archived Workspaces", action: #selector(MainWindowController.toggleShowsArchived(_:)),
             keyEquivalent: "")
+        view.addItem(
+            withTitle: "Show File Previews", action: #selector(MainWindowController.toggleShowsPreviews(_:)),
+            keyEquivalent: "")
 
         let window = NSMenu(title: "Window")
         window.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
