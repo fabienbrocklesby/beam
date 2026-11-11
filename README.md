@@ -1,4 +1,11 @@
-# Beam
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-dark.png">
+    <img src="docs/images/icon-light.png" width="128" height="128" alt="Beam app icon">
+  </picture>
+</p>
+
+<h1 align="center">Beam</h1>
 
 A native macOS terminal for running coding agents. Swift and AppKit on top of
 [libghostty](https://github.com/ghostty-org/ghostty), and nothing else: no
@@ -7,6 +14,11 @@ browser, no web views, no bundled runtimes.
 Run Claude Code, Codex, Gemini and Kimi side by side, one workspace per
 project. Quit whenever you like: the agents keep working, and every pane comes
 back when Beam opens again.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshot-dark.png">
+  <img src="docs/images/screenshot-light.png" alt="A Beam window: a sidebar of workspaces, and one workspace split into a shell, an agent waiting for permission and an agent running tests">
+</picture>
 
 ## What it does
 
@@ -37,7 +49,7 @@ its Retina display.
 
 | | Measured | Budget |
 |---|---|---|
-| App bundle | 21MB | 30MB |
+| App bundle | 23MB | 30MB |
 | Memory, one window with an idle shell | 78MB | 80MB |
 | Memory, a shell and four Claude Code panes | 113MB | 200MB |
 | Cold launch to first prompt | 358ms median | 400ms |
