@@ -14,6 +14,8 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         /// Moves the workspace into the pinned or unpinned section, to the gap
         /// above this row of it, as dropped.
         case move(pinned: Bool, to: Int)
+        /// Renames the workspace to what was typed into its row.
+        case rename(String)
     }
 
     /// What a row shows, so the table reloads only when that changes.
@@ -68,12 +70,20 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
     var onCommand: ((Command, Workspace.ID) -> Void)?
     /// The Workspaces header's add button was clicked.
     var onNewWorkspace: (() -> Void)?
+    /// Return or Escape in a row being renamed: the keyboard goes back to
+    /// the terminal, which ends the edit.
+    var onFinishRename: (() -> Void)?
 
     private let tableView = NSTableView()
     private var items: [Item] = []
     /// Set while `show` changes the table, whose own selection changes then
     /// are not the user's.
     private var isShowing = false
+    /// The workspace whose row is being renamed. Reloading the table would
+    /// end the edit, so what `show` is given meanwhile waits in
+    /// `shownWhileRenaming` until it ends.
+    private var renaming: Workspace.ID?
+    private var shownWhileRenaming: (() -> Void)?
 
     override func loadView() {
         tableView.style = .sourceList
@@ -108,6 +118,12 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         _ workspaces: [Workspace], branches: [Workspace.ID: String], agents: [Workspace.ID: AgentState],
         selection: Workspace.ID?
     ) {
+        guard renaming == nil else {
+            shownWhileRenaming = { [weak self] in
+                self?.show(workspaces, branches: branches, agents: agents, selection: selection)
+            }
+            return
+        }
         isShowing = true
         defer { isShowing = false }
         let rows = workspaces.map { Row($0, branch: branches[$0.id], agent: agents[$0.id]) }
@@ -228,6 +244,11 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         menu.removeAllItems()
         guard let row = row(at: tableView.clickedRow) else { return }
 
+        let rename = NSMenuItem(title: "Rename", action: #selector(renameWorkspace(_:)), keyEquivalent: "")
+        rename.target = self
+        rename.representedObject = row.id
+        menu.addItem(rename)
+        menu.addItem(.separator())
         menu.addItem(item(row.isPinned ? "Unpin" : "Pin", .setPinned(!row.isPinned), row))
 
         let colors = NSMenu()
@@ -260,5 +281,33 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
     @objc private func runMenuCommand(_ sender: NSMenuItem) {
         guard let menuCommand = sender.representedObject as? MenuCommand else { return }
         onCommand?(menuCommand.command, menuCommand.workspace)
+    }
+
+    /// Edits the name in the item's workspace's row.
+    @objc private func renameWorkspace(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? Workspace.ID,
+            let index = items.indices.first(where: { row(at: $0)?.id == id })
+        else { return }
+        tableView.scrollRowToVisible(index)
+        guard let cell = tableView.view(atColumn: 0, row: index, makeIfNecessary: true) as? WorkspaceCellView
+        else { return }
+        let onKey = { [weak self] in
+            guard let self else { return }
+            onFinishRename?()
+            // Ending the edit drops the bold the table gives a selected
+            // row's name, and only reloading the row once the edit is over
+            // puts it back.
+            guard renaming == nil, let index = items.indices.first(where: { row(at: $0)?.id == id }) else { return }
+            tableView.reloadData(forRowIndexes: IndexSet(integer: index), columnIndexes: IndexSet(integer: 0))
+        }
+        let began = cell.beginRename(onKey: onKey) { [weak self] name in
+            guard let self else { return }
+            renaming = nil
+            let show = shownWhileRenaming
+            shownWhileRenaming = nil
+            show?()
+            onCommand?(.rename(name), id)
+        }
+        if began { renaming = id }
     }
 }

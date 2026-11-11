@@ -34,6 +34,37 @@ struct WorkspaceStoreTests {
         #expect(store.open(folder: "/one/") == one)
     }
 
+    @Test func creatingAWorkspaceInAnOpenFolderAddsAnother() throws {
+        var (store, one, _, _) = makeStore()
+        let another = store.create(folder: "/one/")
+        #expect(another != one)
+        #expect(store.selection == another)
+        #expect(folders(store.workspaces) == ["/three", "/two", "/one", "/one"])
+        let workspace = try #require(store.workspace(another))
+        #expect(workspace.tree.panes.map(\.workingDirectory) == ["/one"])
+        #expect(store.open(folder: "/one") == one)
+    }
+
+    @Test func aNewWorkspaceIsNumberedUntilItsNameIsFree() {
+        var store = WorkspaceStore()
+        store.open(folder: "/Users/me/Code/beam")
+        let second = store.create(folder: "/Users/me/Code/beam")
+        let fork = store.create(folder: "/Users/me/Forks/beam")
+        #expect(store.workspace(second)?.name == "beam 2")
+        #expect(store.workspace(fork)?.name == "beam 3")
+        store.rename(second, to: "review")
+        let third = store.create(folder: "/Users/me/Code/beam")
+        #expect(store.workspace(third)?.name == "beam 2")
+    }
+
+    @Test func renamingTrimsTheNameAndAnEmptyNameIsTheFolders() {
+        var (store, one, _, _) = makeStore()
+        store.rename(one, to: "  api server\n")
+        #expect(store.workspace(one)?.name == "api server")
+        store.rename(one, to: " \t")
+        #expect(store.workspace(one)?.name == "one")
+    }
+
     @Test func openingAnArchivedFolderBringsItBack() {
         var (store, _, two, _) = makeStore()
         store.setArchived(two, true)

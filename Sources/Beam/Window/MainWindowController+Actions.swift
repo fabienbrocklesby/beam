@@ -100,7 +100,8 @@ extension MainWindowController: NSMenuItemValidation {
         return true
     }
 
-    /// Asks for a project folder and opens a workspace for it.
+    /// Asks for a project folder and opens a new workspace for it, beside
+    /// any already open there.
     func chooseWorkspaceFolder() {
         guard let window else { return }
         let panel = NSOpenPanel()
@@ -111,7 +112,7 @@ extension MainWindowController: NSMenuItemValidation {
         panel.message = "Choose a project folder for the new workspace."
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
-            self?.update { $0.open(folder: url.path) }
+            self?.update { $0.create(folder: url.path) }
         }
     }
 
@@ -141,6 +142,10 @@ extension MainWindowController: NSMenuItemValidation {
             closeWorkspace(id)
         case .move(let pinned, let position):
             update { $0.moveWorkspace(id, pinned: pinned, to: position) }
+        case .rename(let name):
+            // The edit ended because the keyboard went somewhere: to the
+            // terminal on Return or Escape, else to whatever was clicked.
+            update(movesKeyboardFocus: false) { $0.rename(id, to: name) }
         }
     }
 

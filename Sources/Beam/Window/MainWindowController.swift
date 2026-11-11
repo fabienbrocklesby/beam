@@ -92,6 +92,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
         sidebar.onCommand = { [weak self] command, id in self?.perform(command, on: id) }
         sidebar.onNewWorkspace = { [weak self] in self?.chooseWorkspaceFolder() }
+        sidebar.onFinishRename = { [weak self] in
+            self?.window?.makeFirstResponder(self?.focusedPane?.terminal)
+        }
         launcher.onLaunch = { [weak self] entry in self?.open(entry) }
         launcher.show(installed: installedAgents.agents)
         installedAgents.onChange = { [weak self] in

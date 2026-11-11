@@ -40,7 +40,8 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
 
     // MARK: Opening and selecting
 
-    /// Selects the workspace for `folder`, creating it if there is none.
+    /// Selects the first workspace for `folder`, creating one if there is
+    /// none.
     @discardableResult
     public mutating func open(folder: String) -> Workspace.ID {
         let folder = (folder as NSString).standardizingPath
@@ -48,7 +49,21 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
             select(existing.id)
             return existing.id
         }
-        let workspace = Workspace(folder: folder)
+        return create(folder: folder)
+    }
+
+    /// Creates a workspace for `folder`, whether or not one is open there,
+    /// and selects it. A name another workspace has gets a number, as in
+    /// `beam 2`, and keeps it until renamed.
+    @discardableResult
+    public mutating func create(folder: String) -> Workspace.ID {
+        var workspace = Workspace(folder: (folder as NSString).standardizingPath)
+        let taken = Set(workspaces.map(\.name))
+        var number = 2
+        while taken.contains(workspace.name) {
+            workspace.name = "\(workspace.folderName) \(number)"
+            number += 1
+        }
         workspaces.append(workspace)
         selection = workspace.id
         return workspace.id
@@ -173,6 +188,13 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
 
     public mutating func setColor(_ id: Workspace.ID, _ color: Workspace.Color?) {
         modify(id) { $0.color = color }
+    }
+
+    /// Renames `id` to `name` without the spaces around it. An empty name is
+    /// the folder's again.
+    public mutating func rename(_ id: Workspace.ID, to name: String) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        modify(id) { $0.name = name.isEmpty ? $0.folderName : name }
     }
 
     // MARK: Panes

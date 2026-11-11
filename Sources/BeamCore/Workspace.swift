@@ -38,7 +38,7 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
     public var tree: SplitTree
     public var focusedPane: Pane.ID?
 
-    /// A workspace with one shell in `folder`.
+    /// A workspace with one shell in `folder`, named after it.
     public init(folder: String) {
         id = ID()
         self.folder = folder
@@ -46,6 +46,9 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
         tree = SplitTree()
         reopen()
     }
+
+    /// The folder's own name, which a new workspace takes.
+    public var folderName: String { (folder as NSString).lastPathComponent }
 
     /// `directory` named from the workspace: its name for its own folder,
     /// the path from its name for a folder inside it (`beam/Sources`), and
