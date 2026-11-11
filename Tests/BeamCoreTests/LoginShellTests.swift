@@ -2,13 +2,20 @@ import BeamCore
 import Foundation
 import Testing
 
-struct LoginShellTests {
+/// A class, so each test's instance can take its folder with it.
+final class LoginShellTests {
+    /// This test's stand-in shells, removed when it ends.
+    private let folder = FileManager.default.temporaryDirectory.appending(path: "beam-login-shell-\(UUID().uuidString)")
+
+    deinit {
+        try? FileManager.default.removeItem(at: folder)
+    }
+
     /// A stand-in for the user's shell that runs `body` with the probe's
     /// arguments as `$1` to `$4`.
     func makeShell(_ body: String) throws -> String {
-        let folder = FileManager.default.temporaryDirectory.appending(path: "beam-login-shell-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let shell = folder.appending(path: "shell")
+        let shell = folder.appending(path: "shell-\(UUID().uuidString)")
         try "#!/bin/sh\n\(body)\n".write(to: shell, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shell.path)
         return shell.path

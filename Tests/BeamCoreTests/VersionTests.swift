@@ -2,7 +2,15 @@ import BeamCore
 import Foundation
 import Testing
 
-struct VersionTests {
+/// A class, so each test's instance can take its folder with it.
+final class VersionTests {
+    /// This test's stand-in programs, removed when it ends.
+    private let folder = FileManager.default.temporaryDirectory.appending(path: "beam-version-\(UUID().uuidString)")
+
+    deinit {
+        try? FileManager.default.removeItem(at: folder)
+    }
+
     @Test func readsTheVersionEachAgentPrints() {
         #expect(Version(in: "2.1.281 (Claude Code)")?.description == "2.1.281")
         #expect(Version(in: "codex-cli 0.166.0")?.description == "0.166.0")
@@ -46,9 +54,8 @@ struct VersionTests {
 
     /// A stand-in for an agent's program that runs `body`.
     func makeProgram(_ body: String) throws -> String {
-        let folder = FileManager.default.temporaryDirectory.appending(path: "beam-version-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let program = folder.appending(path: "agent")
+        let program = folder.appending(path: "agent-\(UUID().uuidString)")
         try "#!/bin/sh\n\(body)\n".write(to: program, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: program.path)
         return program.path
