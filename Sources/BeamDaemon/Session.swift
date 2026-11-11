@@ -33,8 +33,12 @@ final class Session {
         terminal = try VirtualTerminal(size: request.size)
         pty = try PseudoTerminal.spawn(
             environment: request.environment, directory: request.workingDirectory, size: request.size)
-        input = Writer(descriptor: pty.master)
-        output = DispatchSource.makeReadSource(fileDescriptor: pty.master, queue: .main)
+        // Closed once both are cancelled, which happens only as the session
+        // goes, so the descriptor is never reused while input or a resize can
+        // reach it.
+        let master = WatchedDescriptor(pty.master)
+        input = Writer(descriptor: master)
+        output = master.makeReadSource()
         exit = DispatchSource.makeProcessSource(identifier: pty.process, eventMask: .exit, queue: .main)
         terminal.onAnswer = { [weak self] answer in
             // An attached pane's terminal answers for itself.
@@ -44,10 +48,6 @@ final class Session {
         output.setEventHandler { [weak self] in
             MainActor.assumeIsolated { self?.readOutput() }
         }
-        // Only once nothing watches it, and only as the session goes, so the
-        // descriptor is never reused while input or a resize can reach it.
-        let master = pty.master
-        output.setCancelHandler { Darwin.close(master) }
         exit.setEventHandler { [weak self] in
             MainActor.assumeIsolated { self?.end() }
         }

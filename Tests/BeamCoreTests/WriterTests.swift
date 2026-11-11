@@ -3,7 +3,8 @@ import Darwin
 import Testing
 
 /// Over a socket pair whose far end is read off the main thread, while the
-/// writer's source runs on the main queue.
+/// writer's source runs on the main queue. The near end closes once the
+/// writer is cancelled, never by the test: its source still watches it.
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct WriterTests {
@@ -19,10 +20,7 @@ struct WriterTests {
     /// Far more than the socket buffer holds, so most of it waits.
     @Test func everythingWrittenArrivesInOrderAndThenItDrains() async throws {
         let (near, far) = try pair()
-        defer {
-            close(near)
-            close(far)
-        }
+        defer { close(far) }
         let sent = (0..<(1 << 20)).map { UInt8(truncatingIfNeeded: $0 &* 31) }
         let reader = Task.detached { () -> [UInt8] in
             var received: [UInt8] = []
@@ -34,7 +32,7 @@ struct WriterTests {
             }
             return received
         }
-        let writer = Writer(descriptor: near)
+        let writer = Writer(descriptor: WatchedDescriptor(near))
         let (drained, drain) = AsyncStream.makeStream(of: Void.self)
         writer.onDrain = { drain.yield() }
         writer.write(Array(sent[..<1000]))
@@ -49,9 +47,8 @@ struct WriterTests {
 
     @Test func aPeerThatHasGoneFailsTheWriter() throws {
         let (near, far) = try pair()
-        defer { close(near) }
         close(far)
-        let writer = Writer(descriptor: near)
+        let writer = Writer(descriptor: WatchedDescriptor(near))
         writer.write([1, 2, 3])
         #expect(writer.failed)
         #expect(writer.pendingCount == 0)

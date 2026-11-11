@@ -6,7 +6,7 @@ import os
 /// One client of beamd's socket, read as `DaemonFrame`s and written as raw
 /// bytes.
 final class Connection {
-    private let descriptor: Int32
+    private let descriptor: WatchedDescriptor
     private let source: any DispatchSourceRead
     private let writer: Writer
     private var reader = DaemonFrameReader()
@@ -18,17 +18,16 @@ final class Connection {
     var onClose: (() -> Void)?
 
     init(descriptor: Int32) {
-        self.descriptor = descriptor
         _ = fcntl(descriptor, F_SETFD, FD_CLOEXEC)
         _ = fcntl(descriptor, F_SETFL, O_NONBLOCK)
         var on: Int32 = 1
         setsockopt(descriptor, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
-        writer = Writer(descriptor: descriptor)
-        source = DispatchSource.makeReadSource(fileDescriptor: descriptor, queue: .main)
+        self.descriptor = WatchedDescriptor(descriptor)
+        writer = Writer(descriptor: self.descriptor)
+        source = self.descriptor.makeReadSource()
         source.setEventHandler { [weak self] in
             MainActor.assumeIsolated { self?.read() }
         }
-        source.setCancelHandler { Darwin.close(descriptor) }
         source.resume()
     }
 
@@ -88,7 +87,7 @@ final class Connection {
 
     private func read() {
         var buffer = [UInt8](repeating: 0, count: 65536)
-        let count = Darwin.read(descriptor, &buffer, buffer.count)
+        let count = Darwin.read(descriptor.value, &buffer, buffer.count)
         if count < 0, errno == EAGAIN || errno == EINTR { return }
         guard count > 0 else { return close() }
         reader.append(buffer[..<count])

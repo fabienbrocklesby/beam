@@ -22,7 +22,7 @@ final class DaemonClient {
     var onClose: (() -> Void)?
     private(set) var isConnected = true
 
-    private let descriptor: Int32
+    private let descriptor: WatchedDescriptor
     private let source: any DispatchSourceRead
     private let writer: Writer
     private var reader = DaemonFrameReader()
@@ -60,16 +60,15 @@ final class DaemonClient {
             return nil
         }
         self.path = path
-        descriptor = socket
         _ = fcntl(socket, F_SETFL, O_NONBLOCK)
+        descriptor = WatchedDescriptor(socket)
         surfaceCommand = Shell.escape(attach)
         paneEnvironment = ["BEAM_SOCKET": path].merging(Self.shellIntegration(bundle: bundle)) { $1 }
-        writer = Writer(descriptor: socket)
-        source = DispatchSource.makeReadSource(fileDescriptor: socket, queue: .main)
+        writer = Writer(descriptor: descriptor)
+        source = descriptor.makeReadSource()
         source.setEventHandler { [weak self] in
             MainActor.assumeIsolated { self?.read() }
         }
-        source.setCancelHandler { Darwin.close(socket) }
         source.resume()
         if let process { reap(process) }
         // The first frame makes this the control connection. A connection
@@ -95,7 +94,7 @@ final class DaemonClient {
 
     private func read() {
         var buffer = [UInt8](repeating: 0, count: 65536)
-        let count = Darwin.read(descriptor, &buffer, buffer.count)
+        let count = Darwin.read(descriptor.value, &buffer, buffer.count)
         if count < 0, errno == EAGAIN || errno == EINTR { return }
         guard count > 0 else { return close() }
         reader.append(buffer[..<count])

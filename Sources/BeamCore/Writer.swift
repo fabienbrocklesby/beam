@@ -6,7 +6,7 @@ import Dispatch
 /// on the main queue, as beamd and Beam both do.
 @MainActor
 public final class Writer {
-    private let descriptor: Int32
+    private let descriptor: WatchedDescriptor
     private var pending: [UInt8] = []
     private let source: any DispatchSourceWrite
     private var waiting = false
@@ -15,9 +15,9 @@ public final class Writer {
     /// Runs each time everything pending has been written.
     public var onDrain: (() -> Void)?
 
-    public init(descriptor: Int32) {
+    public init(descriptor: WatchedDescriptor) {
         self.descriptor = descriptor
-        source = DispatchSource.makeWriteSource(fileDescriptor: descriptor, queue: .main)
+        source = descriptor.makeWriteSource()
         source.setEventHandler { [weak self] in
             MainActor.assumeIsolated { self?.flush() }
         }
@@ -36,7 +36,8 @@ public final class Writer {
         if !waiting { flush() }
     }
 
-    /// Stops writing. Does not close the descriptor, which its owner does.
+    /// Stops writing. The descriptor closes once every other source on it
+    /// is cancelled too.
     public func cancel() {
         if !waiting { source.resume() }
         waiting = true
@@ -45,7 +46,7 @@ public final class Writer {
 
     private func flush() {
         while !pending.isEmpty {
-            let written = pending.withUnsafeBytes { Darwin.write(descriptor, $0.baseAddress, $0.count) }
+            let written = pending.withUnsafeBytes { Darwin.write(descriptor.value, $0.baseAddress, $0.count) }
             if written > 0 {
                 pending.removeFirst(written)
             } else if written < 0, errno == EAGAIN {
