@@ -2,7 +2,8 @@ import AppKit
 import BeamCore
 
 /// The strip along the top of a pane in a split: its agent's state, the
-/// pane's title and a close button. Clicking it focuses the pane,
+/// pane's title, an open button for a document and a close button. Clicking
+/// it focuses the pane,
 /// double-clicking zooms it, and dragging it moves the pane somewhere else in
 /// the workspace.
 final class PaneHeaderView: NSView, NSDraggingSource {
@@ -32,7 +33,21 @@ final class PaneHeaderView: NSView, NSDraggingSource {
         didSet { needsDisplay = true }
     }
 
+    /// The symbol a dragged pane's card shows when no agent has reported.
+    var symbolName = "terminal"
+
+    /// The title of the button before close, which shows while it has one:
+    /// a document's Open in <App>.
+    var openTitle: String? {
+        didSet {
+            openButton.title = openTitle ?? ""
+            openButton.toolTip = openTitle
+            openButton.isHidden = openTitle == nil
+        }
+    }
+
     var onFocus: (() -> Void)?
+    var onOpen: (() -> Void)?
     var onToggleZoom: (() -> Void)?
     var onClose: (() -> Void)?
     /// Called with true as a drag of the pane begins, and false once it ends.
@@ -41,6 +56,7 @@ final class PaneHeaderView: NSView, NSDraggingSource {
     private let pane: Pane.ID
     private let agentMark = NSImageView()
     private let label = NSTextField(labelWithString: "")
+    private let openButton = NSButton()
     private let closeButton = NSButton()
     private var pressLocation: NSPoint?
 
@@ -66,20 +82,35 @@ final class PaneHeaderView: NSView, NSDraggingSource {
         closeButton.target = self
         closeButton.action = #selector(close)
 
-        // A hidden mark drops out of the stack, so the title moves up to the edge.
+        openButton.bezelStyle = .accessoryBarAction
+        openButton.showsBorderOnlyWhileMouseInside = true
+        openButton.font = .systemFont(ofSize: 11)
+        openButton.controlSize = .small
+        openButton.isHidden = true
+        openButton.target = self
+        openButton.action = #selector(open)
+        // The title gives way first in a narrow pane, then the button.
+        openButton.setContentCompressionResistancePriority(.defaultLow - 1, for: .horizontal)
+
+        // A hidden mark or button drops out of its stack, so the title moves
+        // up to the edge.
         let leading = NSStackView(views: [agentMark, label])
         leading.orientation = .horizontal
         leading.spacing = 5
         leading.translatesAutoresizingMaskIntoConstraints = false
-        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        let trailing = NSStackView(views: [openButton, closeButton])
+        trailing.orientation = .horizontal
+        trailing.spacing = 2
+        trailing.translatesAutoresizingMaskIntoConstraints = false
         addSubview(leading)
-        addSubview(closeButton)
+        addSubview(trailing)
         NSLayoutConstraint.activate([
             leading.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
             leading.centerYAnchor.constraint(equalTo: centerYAnchor),
-            leading.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -6),
-            closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
-            closeButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+            leading.trailingAnchor.constraint(lessThanOrEqualTo: trailing.leadingAnchor, constant: -6),
+            trailing.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            trailing.centerYAnchor.constraint(equalTo: centerYAnchor),
+            openButton.heightAnchor.constraint(equalToConstant: 18),
             closeButton.widthAnchor.constraint(equalToConstant: 18),
             closeButton.heightAnchor.constraint(equalToConstant: 18),
         ])
@@ -111,6 +142,10 @@ final class PaneHeaderView: NSView, NSDraggingSource {
 
     @objc private func close() {
         onClose?()
+    }
+
+    @objc private func open() {
+        onOpen?()
     }
 
     // MARK: Clicking and dragging
@@ -203,7 +238,7 @@ final class PaneHeaderView: NSView, NSDraggingSource {
             // agent image's palette rather than add to it.
             let symbol =
                 agent?.image
-                ?? NSImage(systemSymbolName: "terminal", accessibilityDescription: nil)?
+                ?? NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
                 .withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: [.secondaryLabelColor]))
             if let icon = symbol {
                 let size = icon.size

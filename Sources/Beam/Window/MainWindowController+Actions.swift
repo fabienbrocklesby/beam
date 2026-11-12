@@ -181,7 +181,7 @@ extension MainWindowController: NSMenuItemValidation {
     /// on the focused pane, the same path its key takes.
     @objc func performBindingAction(_ sender: NSMenuItem) {
         guard let action = sender.representedObject as? String else { return }
-        focusedPane?.terminal.performBindingAction(action)
+        focusedPane?.terminal?.performBindingAction(action)
     }
 
     @objc func toggleShowsArchived(_ sender: Any?) {
@@ -224,15 +224,21 @@ extension MainWindowController: NSMenuItemValidation {
         window?.makeKey()
     }
 
-    /// Every workspace the sidebar shows, each followed by its panes. A pane
-    /// goes by its agent, else by its directory named from the workspace
-    /// (terminal titles are mostly that same path in full), and one whose
-    /// agent has reported shows its state.
+    /// Every workspace the sidebar shows, each followed by its panes. A
+    /// document goes by its file's name; a terminal by its agent, else by
+    /// its directory named from the workspace (terminal titles are mostly
+    /// that same path in full), and one whose agent has reported shows its
+    /// state.
     private func switcherItems() -> [SwitcherViewController.Item] {
         store.sidebar.flatMap { workspace in
             let folder = (workspace.folder as NSString).abbreviatingWithTildeInPath
             let detail = [folder, branches[workspace.id]].compactMap { $0 }.joined(separator: " · ")
             let panes = workspace.tree.panes.map { pane in
+                if let document = pane.document {
+                    return SwitcherViewController.Item(
+                        target: .pane(pane.id), title: (document as NSString).lastPathComponent,
+                        detail: workspace.name, symbol: "doc.text")
+                }
                 let agent = activity.agent(in: pane.id) ?? pane.command.flatMap(Agent.init(command:))
                 let directory = pane.workingDirectory ?? workspace.folder
                 let title =

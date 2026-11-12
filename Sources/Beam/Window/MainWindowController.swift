@@ -6,9 +6,9 @@ import os
 ///
 /// Owns the `WorkspaceStore`. Every change goes through `update`, which saves
 /// it and then brings the views in line with the store: panes that left it
-/// have their sessions ended and their terminals freed, the selected
-/// workspace's terminals are created on first show, and the other
-/// workspaces are hidden.
+/// have their sessions ended and their views freed, the selected
+/// workspace's panes are created on first show, and the other workspaces
+/// are hidden.
 final class MainWindowController: NSWindowController, NSWindowDelegate {
     let ghostty: GhosttyApp
     private var style: GhosttyApp.SplitStyle
@@ -46,6 +46,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private(set) var branches: [Workspace.ID: String] = [:]
     /// The Cmd+P switcher while it is open.
     var switcher: SwitcherPanel?
+    /// Focuses a document pane once its view takes keyboard focus, as a
+    /// terminal reports for itself.
+    private var firstResponderObservation: NSKeyValueObservation?
 
     /// Opens the window on `store`, which has a workspace selected.
     init(
@@ -97,7 +100,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         sidebar.onCommand = { [weak self] command, id in self?.perform(command, on: id) }
         sidebar.onNewWorkspace = { [weak self] in self?.chooseWorkspaceFolder() }
         sidebar.onFinishRename = { [weak self] in
-            self?.window?.makeFirstResponder(self?.focusedPane?.terminal)
+            self?.window?.makeFirstResponder(self?.focusedPane?.responder)
         }
         launcher.onLaunch = { [weak self] entry in self?.open(entry) }
         launcher.show(installed: installedAgents.agents)
@@ -109,6 +112,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         updates.panesRunning = { [weak self] agent in self?.panes(running: agent) ?? [] }
         showUpdates()
         update { $0 = restored }
+        // AppKit changes the first responder on the main thread.
+        firstResponderObservation = window.observe(\.firstResponder) { [weak self] window, _ in
+            MainActor.assumeIsolated { self?.firstResponderChanged(to: window.firstResponder) }
+        }
         // After the restore, so a click that launched Beam finds its pane.
         notifier.onOpen = { [weak self] pane in
             self?.showWindow(nil)
@@ -145,25 +152,29 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Changing the store
 
     /// Applies `change` to the store and brings the views in line.
-    /// `movesKeyboardFocus` makes the focused pane's terminal first
-    /// responder; it is false when the change records a terminal that is
-    /// already becoming first responder.
+    /// `movesKeyboardFocus` gives the focused pane keyboard focus; it is
+    /// false when the change records a pane that is already taking it.
     func update(movesKeyboardFocus: Bool = true, _ change: (inout WorkspaceStore) -> Void) {
         var next = store
         change(&next)
         guard next != store else { return }
         // Only leaving the store ends a session: a terminal freed with the
-        // window, as Beam quits, leaves it running.
-        let closed = Self.paneIDs(in: store).subtracting(Self.paneIDs(in: next))
+        // window, as Beam quits, leaves it running. A document has none.
+        let remaining = Self.paneIDs(in: next)
+        let closed = Self.panes(in: store).filter { !remaining.contains($0.id) }
         store = next
         saver.save(store)
-        for pane in closed { daemon?.send(.end(pane: pane)) }
-        updatePanes.subtract(closed)
+        for pane in closed where pane.document == nil { daemon?.send(.end(pane: pane.id)) }
+        updatePanes.subtract(closed.map(\.id))
         reconcile(movesKeyboardFocus: movesKeyboardFocus)
     }
 
+    private static func panes(in store: WorkspaceStore) -> [Pane] {
+        store.workspaces.flatMap(\.tree.panes)
+    }
+
     private static func paneIDs(in store: WorkspaceStore) -> Set<Pane.ID> {
-        Set(store.workspaces.flatMap { $0.tree.panes.map(\.id) })
+        Set(panes(in: store).map(\.id))
     }
 
     /// Adds the view for a pane the store is about to gain, so it can start
@@ -203,7 +214,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             return
         }
 
-        // Only the selected workspace gets terminals, so the others cost
+        // A viewer shows the next file in place.
+        for pane in Self.panes(in: store) {
+            if let path = pane.document { paneViews[pane.id]?.showDocument(URL(filePath: path)) }
+        }
+
+        // Only the selected workspace gets views, so the others cost
         // nothing until they are shown.
         var failed: [Pane.ID] = []
         for pane in selected.tree.panes where paneViews[pane.id] == nil {
@@ -222,8 +238,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         showSidebar()
         updateTitle()
 
-        if movesKeyboardFocus, let terminal = focusedPane?.terminal, window?.firstResponder !== terminal {
-            window?.makeFirstResponder(terminal)
+        if movesKeyboardFocus, let responder = focusedPane?.responder, window?.firstResponder !== responder {
+            window?.makeFirstResponder(responder)
         }
         if !failed.isEmpty {
             update { store in
@@ -243,7 +259,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     func updateTitle() {
         guard let selected = store.selectedWorkspace else { return }
         window?.title = selected.name
-        window?.subtitle = focusedPane?.displayTitle ?? ""
+        window?.subtitle = focusedPane?.subtitle ?? ""
     }
 
     private func makeWorkspaceView(_ id: Workspace.ID) -> WorkspaceView {
@@ -271,6 +287,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func makePaneView(_ pane: Pane, in workspace: Workspace.ID, splitFrom parent: TerminalView?) -> PaneView? {
+        let id = pane.id
+        if let path = pane.document {
+            let document = DocumentView(url: URL(filePath: path))
+            document.onEvent = { [weak self] event in self?.handle(event, from: id) ?? false }
+            document.onOpenFile = { [weak self] url in self?.openLinkedFile(url, from: id) }
+            return PaneView(id: id, document: document, style: style)
+        }
         // Typed into the user's own shell rather than run in its place, so the
         // command sees the PATH and variables their rc files set up, which
         // Beam's own environment lacks when it starts from Finder, and the
@@ -286,7 +309,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             Logger.app.error("could not start a terminal for pane \(pane.id, privacy: .public)")
             return nil
         }
-        let id = pane.id
         terminal.onEvent = { [weak self] event in self?.handle(event, from: id) ?? false }
         let view = PaneView(id: id, terminal: terminal, style: style)
         view.directory = pane.workingDirectory
@@ -296,13 +318,23 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         return view
     }
 
+    /// A click or key that puts keyboard focus in a document focuses its
+    /// pane.
+    private func firstResponderChanged(to responder: NSResponder?) {
+        guard let view = responder as? NSView,
+            let pane = paneViews.first(where: { $0.value.document != nil && view.isDescendant(of: $0.value) })?.key,
+            store.selectedWorkspace?.focusedPane != pane
+        else { return }
+        update(movesKeyboardFocus: false) { $0.focus(pane) }
+    }
+
     // MARK: NSWindowDelegate
 
     /// Closing the window quits Beam, which leaves every session running, so
     /// it only asks when the panes run their shells themselves.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard daemon?.isConnected != true else { return true }
-        let running = paneViews.values.contains { $0.terminal.needsConfirmClose }
+        let running = paneViews.values.contains { $0.terminal?.needsConfirmClose == true }
         guard running else { return true }
         confirmClose("Close the window?", needed: true) { [weak self] in self?.window?.close() }
         return false
@@ -338,7 +370,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func needsConfirmClose(_ workspace: Workspace.ID) -> Bool {
-        store.workspace(workspace)?.tree.panes.contains { paneViews[$0.id]?.terminal.needsConfirmClose == true }
+        store.workspace(workspace)?.tree.panes.contains { paneViews[$0.id]?.terminal?.needsConfirmClose == true }
             ?? false
     }
 }

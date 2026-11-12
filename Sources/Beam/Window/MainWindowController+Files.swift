@@ -34,6 +34,28 @@ extension MainWindowController {
         }
     }
 
+    /// Opens a file a link in document `pane` names: in that pane when Beam
+    /// shows its kind, else in its app. A link to nothing beeps.
+    func openLinkedFile(_ url: URL, from pane: Pane.ID) {
+        let url = url.standardizedFileURL
+        Self.fileQueue.async { [weak self] in
+            let exists = FileManager.default.fileExists(atPath: url.path)
+            let kind = DocumentKind(file: url, chosen: false)
+            DispatchQueue.main.async {
+                guard exists else {
+                    Logger.app.info("found no file for a link")
+                    NSSound.beep()
+                    return
+                }
+                guard kind != .external else {
+                    NSWorkspace.shared.open(url)
+                    return
+                }
+                self?.update { $0.updatePane(pane) { $0.document = url.path } }
+            }
+        }
+    }
+
     /// Shows the files a finished turn's reply named in `pane`'s tray, once
     /// found on disk, replacing the last turn's. A reply that names none
     /// that can be previewed hides the tray.

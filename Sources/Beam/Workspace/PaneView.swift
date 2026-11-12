@@ -2,10 +2,12 @@ import AppKit
 import BeamCore
 import Quartz
 
-/// One pane on screen: its terminal, a header while it shares the workspace
-/// with other panes, a tray below while its agent's last reply named files
-/// to preview, and an overlay that dims the terminal while another pane has
-/// focus, and the whole pane while it is being dragged.
+/// One pane on screen: its terminal or its document, a header while it
+/// shares the workspace with other panes (always, for a document, whose
+/// header carries its actions), a tray below a terminal while its agent's
+/// last reply named files to preview, and an overlay that dims the content
+/// while another pane has focus, and the whole pane while it is being
+/// dragged.
 final class PaneView: NSView {
     enum Emphasis {
         /// The only pane on screen.
@@ -15,7 +17,10 @@ final class PaneView: NSView {
     }
 
     let id: Pane.ID
-    let terminal: TerminalView
+    /// Nil for a document.
+    let terminal: TerminalView?
+    /// Nil for a terminal.
+    let document: DocumentView?
     /// The terminal's latest title.
     var title: String? {
         didSet { updateHeaderTitle() }
@@ -69,6 +74,8 @@ final class PaneView: NSView {
     /// Called when the user closes the tray.
     var onClosePreviews: (() -> Void)?
 
+    /// The terminal or the document.
+    private let body: NSView
     private let overlay: Overlay
     private let header: PaneHeaderView
     private var tray: PreviewTrayView?
@@ -80,30 +87,53 @@ final class PaneView: NSView {
         }
     }
 
-    init(id: Pane.ID, terminal: TerminalView, style: GhosttyApp.SplitStyle) {
+    convenience init(id: Pane.ID, terminal: TerminalView, style: GhosttyApp.SplitStyle) {
+        self.init(id: id, body: terminal, terminal: terminal, document: nil, style: style)
+        // The header acts through the same paths as the keyboard: zoom and
+        // close by the terminal's keybinding actions, so confirmation
+        // follows the user's config.
+        header.onToggleZoom = { [weak terminal] in terminal?.performBindingAction("toggle_split_zoom") }
+        header.onClose = { [weak terminal] in terminal?.performBindingAction("close_surface") }
+    }
+
+    /// A document never asks before it closes: closing loses nothing.
+    convenience init(id: Pane.ID, document: DocumentView, style: GhosttyApp.SplitStyle) {
+        self.init(id: id, body: document, terminal: nil, document: document, style: style)
+        header.symbolName = "doc.text"
+        header.menu = document.makeMenu()
+        header.onOpen = { [weak document] in document?.openInApplication(nil) }
+        header.onToggleZoom = { [weak document] in _ = document?.onEvent?(.toggleSplitZoom) }
+        header.onClose = { [weak document] in _ = document?.onEvent?(.closeRequested(processAlive: false)) }
+        document.onApplicationChange = { [weak self, weak document] in
+            self?.header.openTitle = document?.application.map { "Open in \($0.name)" }
+        }
+        updateHeaderTitle()
+    }
+
+    private init(
+        id: Pane.ID, body: NSView, terminal: TerminalView?, document: DocumentView?, style: GhosttyApp.SplitStyle
+    ) {
         self.id = id
+        self.body = body
         self.terminal = terminal
+        self.document = document
         overlay = Overlay(style: style)
         header = PaneHeaderView(pane: id, style: style)
-        super.init(frame: terminal.frame)
+        super.init(frame: body.frame)
         header.isHidden = true
-        addSubview(terminal)
+        addSubview(body)
         addSubview(header)
-        // Over the header too, which it dims along with the terminal while
+        // Over the header too, which it dims along with the content while
         // the pane is lifted. It lets every click through.
         addSubview(overlay)
         overlay.pane = self
         layOutContent()
 
-        // The header acts through the same paths as the keyboard: focus by
-        // making the terminal first responder, zoom and close by its
-        // keybinding actions, so confirmation follows the user's config.
+        // Focus goes where a click would put it.
         header.onFocus = { [weak self] in
             guard let self else { return }
-            window?.makeFirstResponder(terminal)
+            window?.makeFirstResponder(responder)
         }
-        header.onToggleZoom = { [weak self] in self?.terminal.performBindingAction("toggle_split_zoom") }
-        header.onClose = { [weak self] in self?.terminal.performBindingAction("close_surface") }
         header.onDragging = { [weak self] dragging in self?.isLifted = dragging }
     }
 
@@ -130,12 +160,29 @@ final class PaneView: NSView {
             tray.frame = strip
             content = rest
         }
-        terminal.frame = content
+        body.frame = content
     }
 
-    /// What names the pane in its header and the window's subtitle.
+    /// What takes keyboard focus for the pane.
+    var responder: NSView {
+        terminal ?? document?.responder ?? self
+    }
+
+    /// Shows the file at `url` in a document pane.
+    func showDocument(_ url: URL) {
+        document?.show(url)
+        updateHeaderTitle()
+    }
+
+    /// What names the pane in its header: a document's file name.
     var displayTitle: String {
-        title ?? directory.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? ""
+        if let document { return document.url.lastPathComponent }
+        return title ?? directory.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? ""
+    }
+
+    /// What names the pane under the window's title: a document's path.
+    var subtitle: String {
+        document.map { ($0.url.path as NSString).abbreviatingWithTildeInPath } ?? displayTitle
     }
 
     private func updateHeaderTitle() {
@@ -195,7 +242,7 @@ final class PaneView: NSView {
         // The panel takes the first controller up the responder chain from
         // the key window's first responder, which this pane's terminal
         // becomes. It focuses the pane, as any click in it does.
-        window?.makeFirstResponder(terminal)
+        window?.makeFirstResponder(responder)
         panel.updateController()
         panel.makeKeyAndOrderFront(nil)
         panel.currentPreviewItemIndex = index

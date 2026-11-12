@@ -79,7 +79,7 @@ final class WorkspaceView: NSView {
 
         let shown = tree.zoomed.map { [$0] } ?? tree.panes.map(\.id)
         for view in wanted {
-            view.showsHeader = wanted.count > 1
+            view.showsHeader = wanted.count > 1 || view.document != nil
             if !shown.contains(view.id) {
                 view.emphasis = .unfocused
             } else if shown.count == 1 {
@@ -164,7 +164,7 @@ final class WorkspaceView: NSView {
 
     private func updateVisibility() {
         for view in paneViews {
-            view.terminal.setVisible(!isHiddenOrHasHiddenAncestor && (tree.zoomed == nil || tree.zoomed == view.id))
+            view.terminal?.setVisible(!isHiddenOrHasHiddenAncestor && (tree.zoomed == nil || tree.zoomed == view.id))
         }
     }
 
