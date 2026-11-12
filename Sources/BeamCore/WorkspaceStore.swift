@@ -73,11 +73,19 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
     /// `beam 2`, and keeps it until renamed.
     @discardableResult
     public mutating func create(folder: String) -> Workspace.ID {
-        var workspace = Workspace(folder: (folder as NSString).standardizingPath)
+        add(Workspace(folder: (folder as NSString).standardizingPath))
+    }
+
+    /// Appends `workspace`, numbering its name while another workspace has
+    /// it, and selects it.
+    @discardableResult
+    private mutating func add(_ workspace: Workspace) -> Workspace.ID {
+        var workspace = workspace
+        let base = workspace.name
         let taken = Set(workspaces.map(\.name))
         var number = 2
         while taken.contains(workspace.name) {
-            workspace.name = "\(workspace.folderName) \(number)"
+            workspace.name = "\(base) \(number)"
             number += 1
         }
         workspaces.append(workspace)
@@ -244,16 +252,66 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
 
     /// Opens a pane in workspace `id`'s folder, or in `folder`, beside its
     /// largest pane (see `SplitTree.tile`) and focuses it. `command`, when
-    /// set, is typed into the pane's shell as it starts.
+    /// set, is typed into the pane's shell as it starts. The viewer keeps
+    /// its column: when it is the only pane, the new one goes on its left.
     @discardableResult
     public mutating func openPane(
         running command: String?, in id: Workspace.ID, folder: String? = nil, bounds: CGRect
     ) -> Pane.ID? {
         guard let index = index(of: id) else { return nil }
         let pane = Pane(workingDirectory: folder ?? workspaces[index].folder, command: command)
-        workspaces[index].tree.tile(pane, in: bounds)
+        let viewer = workspaces[index].viewer
+        workspaces[index].tree.tile(pane, in: bounds, avoiding: viewer)
+        if !workspaces[index].tree.contains(pane.id) {
+            workspaces[index].tree.insert(pane, atEdge: .left, fraction: 0.5)
+        }
         workspaces[index].focusedPane = pane.id
         return pane.id
+    }
+
+    // MARK: Documents
+
+    /// Shows the file at `path` in the viewer of the workspace holding
+    /// `pane`, or in a new one: a full height column on the workspace's
+    /// right edge, half the width beside one pane and 40% beside more.
+    /// Focus stays where it was, so the user keeps typing to the agent that
+    /// named the file. A zoom that would hide the viewer ends.
+    ///
+    /// - Returns: The viewer, or nil when no workspace holds `pane`.
+    @discardableResult
+    public mutating func showDocument(_ path: String, from pane: Pane.ID) -> Pane.ID? {
+        let path = (path as NSString).standardizingPath
+        guard let index = workspaces.firstIndex(where: { $0.tree.contains(pane) }) else { return nil }
+        if let viewer = workspaces[index].viewer {
+            if workspaces[index].tree.pane(viewer)?.document != path {
+                workspaces[index].tree.updatePane(viewer) { $0.document = path }
+            }
+            if let zoomed = workspaces[index].tree.zoomed, zoomed != viewer { workspaces[index].tree.unzoom() }
+            return viewer
+        }
+        let viewer = Pane(document: path)
+        let fraction = workspaces[index].tree.panes.count == 1 ? 0.5 : 0.4
+        workspaces[index].tree.insert(viewer, atEdge: .right, fraction: fraction)
+        workspaces[index].viewer = viewer.id
+        return viewer.id
+    }
+
+    /// Opens the file at `path` as Finder asks: a pane already showing it
+    /// is selected and focused; otherwise the file gets a new workspace in
+    /// its folder, named after it, where it is the only pane.
+    @discardableResult
+    public mutating func openDocument(_ path: String) -> Pane.ID {
+        let path = (path as NSString).standardizingPath
+        for workspace in workspaces {
+            if let pane = workspace.tree.panes.first(where: { $0.document == path }) {
+                select(workspace.id)
+                focus(pane.id)
+                return pane.id
+            }
+        }
+        let pane = Pane.ID()
+        add(Workspace(document: path, pane: pane))
+        return pane
     }
 
     /// Moves `pane` onto `target` as `drop` says and focuses it. Both must be
@@ -288,6 +346,9 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
         let neighbour = workspaces[index].tree.remove(pane)
         if workspaces[index].focusedPane == pane {
             workspaces[index].focusedPane = neighbour
+        }
+        if workspaces[index].viewer == pane {
+            workspaces[index].viewer = nil
         }
         if workspaces[index].tree.isEmpty {
             close(workspaces[index].id)

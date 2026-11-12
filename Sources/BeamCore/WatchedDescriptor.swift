@@ -33,6 +33,16 @@ public final class WatchedDescriptor {
         return source
     }
 
+    /// Its cancel handler is the descriptor's: do not set another.
+    public func makeFileSystemObjectSource(
+        eventMask: DispatchSource.FileSystemEvent
+    ) -> any DispatchSourceFileSystemObject {
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: value, eventMask: eventMask, queue: .main)
+        watch(source)
+        return source
+    }
+
     private func watch(_ source: any DispatchSourceProtocol) {
         watching += 1
         // Holds this until the last source has gone, however long its owner

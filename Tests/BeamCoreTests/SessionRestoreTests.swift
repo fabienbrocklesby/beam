@@ -42,6 +42,23 @@ struct SessionRestoreTests {
         #expect(restore.orphans(in: store, stateLoaded: true) == [orphan])
     }
 
+    /// A document has no terminal, so nothing is typed into one.
+    @Test func aDocumentTypesNothing() {
+        var document = Pane(document: "/project/plan.md")
+        document.command = "claude"
+        #expect(SessionRestore(live: []).initialCommand(for: document) == nil)
+    }
+
+    /// A document pane attaches to nothing, so a session under its ID would
+    /// run on unseen.
+    @Test func aSessionUnderADocumentsIDIsAnOrphan() throws {
+        var (store, shell, _) = relaunched()
+        let shown = store.showDocument("/project/plan.md", from: shell.id)
+        let document = try #require(shown)
+        let restore = SessionRestore(live: [shell.id, document])
+        #expect(restore.orphans(in: store, stateLoaded: true) == [document])
+    }
+
     /// Without a state file that loaded, Beam cannot tell whose they are.
     @Test func nothingIsAnOrphanWhenTheStateFileDidNotLoad() {
         let (store, shell, _) = relaunched()

@@ -86,17 +86,18 @@ extension SplitTree {
     /// across its longer side, so panes opened one after another fill a grid
     /// and the others stay where they are. Panes within 1% of the largest
     /// count as equal and the later in reading order wins, so the first pane,
-    /// usually the user's own shell, keeps its space longest.
-    public mutating func tile(_ pane: Pane, in bounds: CGRect) {
+    /// usually the user's own shell, keeps its space longest. `avoiding` is
+    /// never split; when it is the only pane, nothing changes.
+    public mutating func tile(_ pane: Pane, in bounds: CGRect, avoiding avoided: Pane.ID? = nil) {
         let frames = arrangement(in: bounds, dividerThickness: 0).frames
         var largest: (id: Pane.ID, frame: CGRect)?
-        for existing in panes {
+        for existing in panes where existing.id != avoided {
             guard let frame = frames[existing.id] else { continue }
             if let largest, frame.width * frame.height < largest.frame.width * largest.frame.height * 0.99 { continue }
             largest = (existing.id, frame)
         }
         guard let largest else {
-            self = SplitTree(pane)
+            if isEmpty { self = SplitTree(pane) }
             return
         }
         split(largest.id, toward: largest.frame.width >= largest.frame.height ? .right : .down, inserting: pane)

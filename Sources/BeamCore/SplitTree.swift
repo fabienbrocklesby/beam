@@ -92,6 +92,21 @@ public struct SplitTree: Codable, Equatable, Sendable {
         zoomed = nil
     }
 
+    /// Adds `pane` along the whole `direction` edge, taking `fraction` of
+    /// the space, with everything else beside it as it was.
+    public mutating func insert(_ pane: Pane, atEdge direction: Direction, fraction: Double) {
+        guard let root else {
+            self = SplitTree(pane)
+            return
+        }
+        let share = min(max(fraction, 0), 1)
+        self.root = .split(
+            direction.isForward
+                ? Split(axis: direction.axis, ratio: 1 - share, first: root, second: .pane(pane))
+                : Split(axis: direction.axis, ratio: share, first: .pane(pane), second: root))
+        zoomed = nil
+    }
+
     /// Removes `id` and gives its space to its sibling.
     ///
     /// - Returns: The pane that should take focus: the one in the sibling

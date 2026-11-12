@@ -37,6 +37,9 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
     public var isArchived = false
     public var tree: SplitTree
     public var focusedPane: Pane.ID?
+    /// The document pane the workspace last showed a file in, which the next
+    /// file shown goes into. Absent from files Beam 0.1 wrote.
+    public var viewer: Pane.ID?
 
     /// A workspace with one shell in `folder`, named after it.
     public init(folder: String) {
@@ -45,6 +48,17 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
         name = (folder as NSString).lastPathComponent
         tree = SplitTree()
         reopen()
+    }
+
+    /// A workspace in the folder of the file at `document`, named after the
+    /// file, showing it in its only pane, `pane`.
+    public init(document: String, pane: Pane.ID = Pane.ID()) {
+        id = ID()
+        folder = (document as NSString).deletingLastPathComponent
+        name = (document as NSString).lastPathComponent
+        tree = SplitTree(Pane(id: pane, document: document))
+        focusedPane = pane
+        viewer = pane
     }
 
     /// The folder's own name, which a new workspace takes.
@@ -74,5 +88,6 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
     mutating func empty() {
         tree = SplitTree()
         focusedPane = nil
+        viewer = nil
     }
 }

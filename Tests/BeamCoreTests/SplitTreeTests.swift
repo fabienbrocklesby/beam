@@ -230,6 +230,53 @@ struct SplitTreeTests {
         #expect(tree.contains(d.id))
     }
 
+    /// The viewer keeps its column: a new pane goes beside the others.
+    @Test func tilingAvoidsAPaneItIsToldTo() {
+        var tree = SplitTree(a)
+        tree.split(a.id, toward: .right, inserting: b)
+        tree.tile(c, in: bounds, avoiding: b.id)
+        #expect(cells(tree, in: bounds) == [a.id: [0, 0], c.id: [0, 1], b.id: [1, 0]])
+    }
+
+    @Test func tilingWithOnlyTheAvoidedPaneChangesNothing() {
+        var tree = SplitTree(a)
+        tree.tile(b, in: bounds, avoiding: a.id)
+        #expect(tree == SplitTree(a))
+    }
+
+    // MARK: Edges
+
+    @Test func insertingAtAnEdgeWrapsTheWholeTree() throws {
+        var tree = threePanes
+        tree.insert(d, atEdge: .right, fraction: 0.4)
+        #expect(cells(tree, in: bounds) == [a.id: [0, 0], b.id: [1, 0], c.id: [1, 1], d.id: [2, 0]])
+        let frames = tree.layout(in: bounds, dividerThickness: 0).frames
+        let column = try #require(frames[d.id])
+        #expect(column.height == bounds.height)
+        #expect(abs(column.width - bounds.width * 0.4) <= 1)
+    }
+
+    @Test func insertingAtTheLeftEdgePutsThePaneFirst() throws {
+        var tree = SplitTree(a)
+        tree.insert(b, atEdge: .left, fraction: 0.5)
+        #expect(tree.panes.map(\.id) == [b.id, a.id])
+        let frames = tree.layout(in: bounds, dividerThickness: 0).frames
+        #expect(abs(try #require(frames[b.id]).width - bounds.width / 2) <= 1)
+    }
+
+    @Test func insertingIntoAnEmptyTreeMakesThePaneItsRoot() {
+        var tree = SplitTree()
+        tree.insert(a, atEdge: .right, fraction: 0.4)
+        #expect(tree == SplitTree(a))
+    }
+
+    @Test func insertingAtAnEdgeEndsZoom() {
+        var tree = threePanes
+        tree.toggleZoom(a.id)
+        tree.insert(d, atEdge: .right, fraction: 0.4)
+        #expect(tree.zoomed == nil)
+    }
+
     // MARK: Dragging dividers
 
     @Test func draggedDividerFollowsThePointer() throws {
