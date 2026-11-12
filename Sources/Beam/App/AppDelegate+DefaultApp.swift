@@ -1,10 +1,13 @@
 import AppKit
+import BeamCore
 import UniformTypeIdentifiers
 import os
 
-// Beam > Make Beam the Default App…. macOS sets a default app without asking
-// the user, so Beam asks first, then says what Finder will do.
+// Beam > Make Beam the Default App…. macOS replaces some defaults without
+// asking the user, so Beam asks first, then says what Finder will do.
 extension AppDelegate {
+    private typealias Outcomes = [(kind: String, outcome: DefaultAppReport.Outcome)]
+
     /// The files Beam offers to open, as the alerts name them.
     private nonisolated static let defaultKinds = [
         (name: "PDFs", type: "com.adobe.pdf"),
@@ -16,8 +19,8 @@ extension AppDelegate {
         let alert = NSAlert()
         alert.messageText = "Make Beam the default app for PDFs, Markdown and plain text?"
         alert.informativeText = """
-            Finder will open them in Beam. To change one back, choose Get Info on a \
-            file in Finder, pick an app under Open With, then Change All.
+            Finder will open them in Beam. macOS may ask you to confirm each one. To change \
+            one back, choose Get Info on a file in Finder, pick an app under Open With, then Change All.
             """
         alert.addButton(withTitle: "Make Default")
         alert.addButton(withTitle: "Cancel")
@@ -29,51 +32,33 @@ extension AppDelegate {
         }
     }
 
-    /// Makes `beam` the default for each kind, then asks which app opens it:
-    /// a default names a bundle ID and a version, so at equal versions
-    /// Launch Services can pick another copy of Beam. Both ask Launch
-    /// Services, so this runs off the main thread.
-    private nonisolated static func makeDefault(_ beam: URL) async -> [(name: String, opener: Result<URL?, any Error>)]
-    {
+    /// Makes `beam` the default for each kind, then asks which app opens it.
+    /// Both ask Launch Services, so this runs off the main thread.
+    private nonisolated static func makeDefault(_ beam: URL) async -> Outcomes {
         let workspace = NSWorkspace.shared
-        var results: [(name: String, opener: Result<URL?, any Error>)] = []
+        var outcomes: Outcomes = []
         for kind in defaultKinds {
             guard let type = UTType(kind.type) else {
-                results.append((kind.name, .failure(CocoaError(.featureUnsupported))))
+                outcomes.append((kind.name, .failed("macOS does not know the type \(kind.type).")))
                 continue
             }
             do {
                 try await workspace.setDefaultApplication(at: beam, toOpen: type)
-                results.append((kind.name, .success(workspace.urlForApplication(toOpen: type))))
+                let opener = workspace.urlForApplication(toOpen: type)
+                outcomes.append((kind.name, opener.map { .opens($0.standardizedFileURL.path) } ?? .kept))
             } catch {
                 Logger.app.error("could not make Beam the default for \(kind.type, privacy: .public): \(error)")
-                results.append((kind.name, .failure(error)))
+                outcomes.append((kind.name, DefaultAppReport.Outcome(error)))
             }
         }
-        return results
+        return outcomes
     }
 
-    private static func report(_ results: [(name: String, opener: Result<URL?, any Error>)], beam: URL) {
-        var failed: [String] = []
-        var notes: [String] = []
-        for (name, opener) in results {
-            switch opener {
-            case .failure(let error):
-                failed.append(name)
-                // One cause usually fails all three.
-                if !notes.contains(error.localizedDescription) { notes.append(error.localizedDescription) }
-            case .success(let app?) where app.standardizedFileURL != beam.standardizedFileURL:
-                notes.append("\((app.path as NSString).abbreviatingWithTildeInPath) opens \(name).")
-            case .success:
-                break
-            }
-        }
+    private static func report(_ outcomes: Outcomes, beam: URL) {
+        let report = DefaultAppReport(outcomes, beam: beam.standardizedFileURL.path)
         let alert = NSAlert()
-        alert.messageText =
-            failed.isEmpty
-            ? "Beam is now the default app for PDFs, Markdown and plain text."
-            : "Beam could not be made the default app for \(failed.formatted(.list(type: .and)))."
-        alert.informativeText = notes.joined(separator: "\n")
+        alert.messageText = report.message
+        alert.informativeText = report.details
         alert.runModal()
     }
 }
