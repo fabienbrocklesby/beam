@@ -18,6 +18,9 @@ final class DocumentView: NSView, NSMenuItemValidation {
     var onOpenFile: ((URL) -> Void)?
     /// Called when the app the file opens in outside Beam changes.
     var onApplicationChange: (() -> Void)?
+    /// Called with a key the document did not take, for the pane and
+    /// workspace keys a terminal would run. True when it was used.
+    var onKeyEquivalent: ((NSEvent) -> Bool)?
 
     private(set) var url: URL
     /// The app that opens the file outside Beam, and its name. Never Beam:
@@ -85,6 +88,7 @@ final class DocumentView: NSView, NSMenuItemValidation {
         case let view as MarkdownView: view.textView
         case let view as TextDocumentView: view.textView
         case let view as ImageDocumentView: view.imageView
+        case let view as PDFDocumentView: view.pdfView
         case let view?: view
         case nil: self
         }
@@ -247,9 +251,8 @@ final class DocumentView: NSView, NSMenuItemValidation {
 
     private func lookUpApplication() {
         let url = url
-        let beam = Bundle.main.bundleURL
         Self.queue.async { [weak self] in
-            let found = Self.externalApplication(for: url, besides: beam)
+            let found = NSWorkspace.shared.applicationOutsideBeam(toOpen: url)
             DispatchQueue.main.async {
                 guard let self, self.url == url else { return }
                 self.application = found
@@ -257,21 +260,6 @@ final class DocumentView: NSView, NSMenuItemValidation {
                 self.onApplicationChange?()
             }
         }
-    }
-
-    /// The file's default app unless that is a copy of Beam, then the first
-    /// other app Launch Services lists for it.
-    private nonisolated static func externalApplication(
-        for url: URL, besides beam: URL
-    ) -> (url: URL, name: String)? {
-        let workspace = NSWorkspace.shared
-        let copies = Bundle.main.bundleIdentifier.map { workspace.urlsForApplications(withBundleIdentifier: $0) } ?? []
-        let beams = Set((copies + [beam]).map(\.standardizedFileURL))
-        let apps =
-            [workspace.urlForApplication(toOpen: url)].compactMap { $0 } + workspace.urlsForApplications(toOpen: url)
-        guard let app = apps.first(where: { !beams.contains($0.standardizedFileURL) }) else { return nil }
-        let name = FileManager.default.displayName(atPath: app.path)
-        return (app, name.hasSuffix(".app") ? String(name.dropLast(4)) : name)
     }
 
     /// The header's and the placeholder's menu.
@@ -310,21 +298,28 @@ final class DocumentView: NSView, NSMenuItemValidation {
 
     // MARK: Keys and focus
 
-    /// Cmd+=, Cmd+- and Cmd+0 zoom a PDF or an image, as in Preview.
+    /// Cmd+=, Cmd+- and Cmd+0 zoom a PDF or an image, as in Preview. Other
+    /// keys go to the window for the pane and workspace actions the user's
+    /// config binds to them, which a terminal would run itself.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard event.type == .keyDown, (window?.firstResponder as? NSView)?.isDescendant(of: self) == true,
-            event.modifierFlags.intersection([.command, .control, .option]) == .command
-        else { return super.performKeyEquivalent(with: event) }
-        let zoom: Selector
-        switch event.charactersIgnoringModifiers {
-        case "=", "+": zoom = #selector(PDFView.zoomIn(_:))
-        case "-": zoom = #selector(PDFView.zoomOut(_:))
-        case "0": zoom = #selector(PDFDocumentView.zoomToFit(_:))
-        default: return super.performKeyEquivalent(with: event)
+        guard event.type == .keyDown, (window?.firstResponder as? NSView)?.isDescendant(of: self) == true else {
+            return super.performKeyEquivalent(with: event)
         }
-        guard let content, content.responds(to: zoom) else { return super.performKeyEquivalent(with: event) }
-        content.perform(zoom, with: nil)
-        return true
+        if let zoom = Self.zoom(for: event), let content, content.responds(to: zoom) {
+            content.perform(zoom, with: nil)
+            return true
+        }
+        return onKeyEquivalent?(event) == true || super.performKeyEquivalent(with: event)
+    }
+
+    private static func zoom(for event: NSEvent) -> Selector? {
+        guard event.modifierFlags.intersection([.command, .control, .option]) == .command else { return nil }
+        switch event.charactersIgnoringModifiers {
+        case "=", "+": return #selector(PDFDocumentView.zoomIn(_:))
+        case "-": return #selector(PDFDocumentView.zoomOut(_:))
+        case "0": return #selector(PDFDocumentView.zoomToFit(_:))
+        default: return nil
+        }
     }
 
     override var acceptsFirstResponder: Bool { true }

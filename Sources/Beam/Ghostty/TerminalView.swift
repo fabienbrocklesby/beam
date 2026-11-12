@@ -141,6 +141,21 @@ final class TerminalView: NSView {
         return action.withCString { ghostty_surface_binding_action(surface, $0, UInt(action.utf8.count)) }
     }
 
+    // The Edit menu's items come down the responder chain, so they reach a
+    // document's view or a text field as well. Here they run the binding
+    // actions their keys run.
+    @objc func copy(_ sender: Any?) {
+        performBindingAction("copy_to_clipboard")
+    }
+
+    @objc func paste(_ sender: Any?) {
+        performBindingAction("paste_from_clipboard")
+    }
+
+    override func selectAll(_ sender: Any?) {
+        performBindingAction("select_all")
+    }
+
     /// Hidden terminals stop rendering until shown again. The workspace calls
     /// this for every pane on every change, so only changes reach libghostty.
     func setVisible(_ visible: Bool) {

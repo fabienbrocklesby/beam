@@ -73,6 +73,10 @@ final class PaneView: NSView {
     }
     /// Called when the user closes the tray.
     var onClosePreviews: (() -> Void)?
+    /// Called with a file in the tray to show in the workspace's viewer.
+    var onShowFile: ((URL) -> Void)?
+    /// Called with a file in the tray to open in its app.
+    var onOpenFile: ((URL) -> Void)?
 
     /// The terminal or the document.
     private let body: NSView
@@ -206,8 +210,9 @@ final class PaneView: NSView {
 
     private func makeTray() -> PreviewTrayView {
         let tray = PreviewTrayView(style: style)
-        tray.onPreview = { [weak self] index in self?.showQuickLook(at: index) }
+        tray.onShow = { [weak self] index in self?.show(at: index) }
         tray.onOpen = { [weak self] index in self?.open(at: index) }
+        tray.onQuickLook = { [weak self] index in self?.showQuickLook(at: index) }
         tray.onClose = { [weak self] in
             self?.previews = []
             self?.onClosePreviews?()
@@ -218,10 +223,15 @@ final class PaneView: NSView {
         return tray
     }
 
+    private func show(at index: Int) {
+        guard previews.indices.contains(index) else { return }
+        onShowFile?(previews[index])
+    }
+
     private func open(at index: Int) {
         guard previews.indices.contains(index) else { return }
         if controlsQuickLook { QLPreviewPanel.shared()?.orderOut(nil) }
-        NSWorkspace.shared.open(previews[index])
+        onOpenFile?(previews[index])
     }
 
     // MARK: Quick Look

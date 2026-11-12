@@ -65,6 +65,22 @@ enum MainMenu {
         shell.addItem(binding("Close", "close_surface"))
         shell.addItem(binding("Close Workspace", "close_tab:this"))
 
+        // Along the responder chain rather than run on the focused pane, so a
+        // terminal, a document and a text field each answer in their own way.
+        // Ghostty binds Cmd+C, Cmd+V and Cmd+F as performable, and reports no
+        // such key for a menu, so these start from the macOS keys.
+        func editItem(_ title: String, _ selector: Selector, _ action: String, _ key: String) -> NSMenuItem {
+            boundKey(NSMenuItem(title: title, action: selector, keyEquivalent: key), action)
+        }
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(editItem("Copy", #selector(NSText.copy(_:)), "copy_to_clipboard", "c"))
+        edit.addItem(editItem("Paste", #selector(NSText.paste(_:)), "paste_from_clipboard", "v"))
+        edit.addItem(editItem("Select All", #selector(NSResponder.selectAll(_:)), "select_all", "a"))
+        edit.addItem(.separator())
+        let find = editItem("Find…", #selector(NSResponder.performTextFinderAction(_:)), "start_search", "f")
+        find.tag = NSTextFinder.Action.showFindInterface.rawValue
+        edit.addItem(find)
+
         let view = NSMenu(title: "View")
         view.addItem(
             withTitle: "Toggle Sidebar", action: #selector(NSSplitViewController.toggleSidebar(_:)), keyEquivalent: "s"
@@ -104,7 +120,7 @@ enum MainMenu {
         NSApp.windowsMenu = window
 
         let main = NSMenu()
-        for menu in [app, shell, view, agents.makeMenu(), window] {
+        for menu in [app, shell, edit, view, agents.makeMenu(), window] {
             let item = NSMenuItem()
             item.submenu = menu
             main.addItem(item)

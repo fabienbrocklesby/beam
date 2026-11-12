@@ -34,6 +34,19 @@ public enum BindingAction: Equatable, Sendable {
     case selectAll
     case startSearch
 
+    /// The actions whose keys work from a focused document, written as a
+    /// config binds them, since a key is looked up by the exact action:
+    /// `resize_split:up,10` and not `resize_split:up,20`. The parameters
+    /// are Ghostty's macOS defaults. Copy, paste, select all and find are
+    /// left out: the Edit menu sends those to the focused view itself.
+    public static let documentKeys: [String] =
+        ["right", "down", "left", "up", "auto"].map { "new_split:\($0)" }
+        + ["previous", "next", "up", "down", "left", "right"].map { "goto_split:\($0)" }
+        + ["up", "down", "left", "right"].map { "resize_split:\($0),10" }
+        + ["toggle_split_zoom", "equalize_splits", "close_surface"]
+        + ["new_tab", "new_window", "close_tab:this", "close_window", "previous_tab", "next_tab", "last_tab"]
+        + (1...9).map { "goto_tab:\($0)" }
+
     /// Nil for an action Beam leaves to the terminal, or a parameter Ghostty
     /// would not take.
     public init?(_ action: String) {

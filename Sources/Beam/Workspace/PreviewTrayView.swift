@@ -6,8 +6,8 @@ import os
 
 /// The strip along the bottom of a pane that shows the files its agent's
 /// last reply named, each as a thumbnail and its name. Clicking one shows it
-/// in Quick Look, double-clicking opens it in its app, and dragging one
-/// carries the file.
+/// in the workspace's viewer, double-clicking opens it in its app, its menu
+/// shows it in Quick Look, and dragging one carries the file.
 final class PreviewTrayView: NSView {
     static let height = 52.0
     /// Most files a tray shows: the first a reply named.
@@ -43,10 +43,12 @@ final class PreviewTrayView: NSView {
         }
     }
 
-    /// Called with the index of the file to show in Quick Look.
-    var onPreview: ((Int) -> Void)?
+    /// Called with the index of the file to show in the viewer.
+    var onShow: ((Int) -> Void)?
     /// Called with the index of the file to open in its app.
     var onOpen: ((Int) -> Void)?
+    /// Called with the index of the file to show in Quick Look.
+    var onQuickLook: ((Int) -> Void)?
     var onClose: (() -> Void)?
 
     private let stack = NSStackView()
@@ -120,8 +122,9 @@ final class PreviewTrayView: NSView {
         for chip in stack.arrangedSubviews { chip.removeFromSuperview() }
         for (index, url) in files.prefix(Self.limit).enumerated() {
             let chip = PreviewChip(url: url, style: style)
-            chip.onClick = { [weak self] in self?.onPreview?(index) }
+            chip.onClick = { [weak self] in self?.onShow?(index) }
             chip.onDoubleClick = { [weak self] in self?.onOpen?(index) }
+            chip.onQuickLook = { [weak self] in self?.onQuickLook?(index) }
             stack.addArrangedSubview(chip)
         }
     }
@@ -144,6 +147,7 @@ private final class PreviewChip: NSView, NSDraggingSource {
     }
     var onClick: (() -> Void)?
     var onDoubleClick: (() -> Void)?
+    var onQuickLook: (() -> Void)?
     var thumbnail: NSImage? { imageView.image }
 
     private let imageView = NSImageView()
@@ -184,6 +188,8 @@ private final class PreviewChip: NSView, NSDraggingSource {
         ])
 
         toolTip = (url.path(percentEncoded: false) as NSString).abbreviatingWithTildeInPath
+        menu = NSMenu()
+        menu?.addItem(withTitle: "Quick Look", action: #selector(showQuickLook), keyEquivalent: "").target = self
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
         setAccessibilityLabel(url.lastPathComponent)
@@ -197,6 +203,10 @@ private final class PreviewChip: NSView, NSDraggingSource {
     override func accessibilityPerformPress() -> Bool {
         onClick?()
         return true
+    }
+
+    @objc private func showQuickLook() {
+        onQuickLook?()
     }
 
     // A tile in the terminal's own background, edged like the drag cards,

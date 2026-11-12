@@ -1,4 +1,5 @@
 import AppKit
+import BeamCore
 import GhosttyKit
 
 // What the rest of the app reads from the user's Ghostty config, as last
@@ -21,6 +22,14 @@ extension GhosttyApp {
     struct KeyEquivalent {
         var key: String
         var modifiers: NSEvent.ModifierFlags
+
+        /// Whether `event` presses this key: the same modifiers, and the
+        /// same character with them taken off, so Cmd+Shift+[ is `[`.
+        func matches(_ event: NSEvent) -> Bool {
+            let relevant: NSEvent.ModifierFlags = [.command, .shift, .option, .control]
+            return event.modifierFlags.intersection(relevant) == modifiers.intersection(relevant)
+                && event.characters(byApplyingModifiers: [])?.lowercased() == key
+        }
     }
 
     /// Whether quitting would kill a running command in any terminal.
@@ -77,6 +86,13 @@ extension GhosttyApp {
         default:
             return nil
         }
+    }
+
+    /// The pane or workspace action the user's config binds to `event`'s
+    /// key, for a focused document, which has no surface to ask. Only one
+    /// key per action is found: the one a menu would show.
+    func documentAction(for event: NSEvent) -> BindingAction? {
+        BindingAction.documentKeys.first { keyEquivalent(for: $0)?.matches(event) == true }.flatMap(BindingAction.init)
     }
 
     /// Physical keys whose menu key equivalent does not depend on the keyboard

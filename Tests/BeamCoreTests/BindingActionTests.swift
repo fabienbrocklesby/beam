@@ -57,6 +57,22 @@ struct BindingActionTests {
         #expect(BindingAction("start_search") == .startSearch)
     }
 
+    /// The Edit menu sends copy, paste, select all and find to the focused
+    /// view itself, so a document listens only for pane and workspace keys.
+    @Test func aDocumentListensForPaneAndWorkspaceKeys() {
+        let keys = BindingAction.documentKeys
+        #expect(keys.count == Set(keys).count)
+        for key in keys {
+            let action = BindingAction(key)
+            #expect(action != nil, "\(key)")
+            #expect(![.copyToClipboard, .pasteFromClipboard, .selectAll, .startSearch].contains(action), "\(key)")
+        }
+        // As Ghostty's macOS defaults write them, parameters included.
+        for key in ["new_split:right", "goto_split:left", "resize_split:up,10", "goto_tab:1", "close_tab:this"] {
+            #expect(keys.contains(key), "\(key)")
+        }
+    }
+
     @Test func actionsBeamDoesNotHandleParseToNothing() {
         #expect(BindingAction("increase_font_size:1") == nil)
         #expect(BindingAction("") == nil)

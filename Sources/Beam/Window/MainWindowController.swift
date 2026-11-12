@@ -292,6 +292,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             let document = DocumentView(url: URL(filePath: path))
             document.onEvent = { [weak self] event in self?.handle(event, from: id) ?? false }
             document.onOpenFile = { [weak self] url in self?.openLinkedFile(url, from: id) }
+            document.onKeyEquivalent = { [weak self] event in
+                guard let self, let action = self.ghostty.documentAction(for: event) else { return false }
+                return self.perform(action, from: id)
+            }
             return PaneView(id: id, document: document, style: style)
         }
         // Typed into the user's own shell rather than run in its place, so the
@@ -315,6 +319,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         view.agent = activity[id]
         view.previews = previews[id] ?? []
         view.onClosePreviews = { [weak self] in self?.previews[id] = nil }
+        view.onShowFile = { [weak self] url in self?.showFile(url, from: id) }
+        view.onOpenFile = { [weak self] url in self?.openOutsideBeam(url) }
         return view
     }
 

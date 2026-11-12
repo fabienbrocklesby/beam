@@ -178,10 +178,23 @@ extension MainWindowController: NSMenuItemValidation {
     }
 
     /// Runs the Ghostty keybinding action in the item's `representedObject`
-    /// on the focused pane, the same path its key takes.
+    /// on the focused pane, the same path its key takes. A document has no
+    /// surface to run it, so Beam acts on it itself.
     @objc func performBindingAction(_ sender: NSMenuItem) {
-        guard let action = sender.representedObject as? String else { return }
-        focusedPane?.terminal?.performBindingAction(action)
+        guard let action = sender.representedObject as? String, let pane = focusedPane else { return }
+        if let terminal = pane.terminal {
+            terminal.performBindingAction(action)
+        } else if let action = BindingAction(action) {
+            perform(action, from: pane.id)
+        }
+    }
+
+    /// Acts on a keybinding action from document `pane` as a terminal's
+    /// surface would. False when Beam has nothing to do for it.
+    @discardableResult
+    func perform(_ action: BindingAction, from pane: Pane.ID) -> Bool {
+        guard let event = TerminalEvent(action, size: paneViews[pane]?.bounds.size ?? .zero) else { return false }
+        return handle(event, from: pane)
     }
 
     @objc func toggleShowsArchived(_ sender: Any?) {

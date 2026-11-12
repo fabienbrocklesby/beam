@@ -10,27 +10,64 @@ extension MainWindowController {
     private static let fileQueue = DispatchQueue(label: "dev.beam.terminal.files", qos: .userInitiated)
 
     /// Opens what a Cmd+clicked link in `pane` names: a web address in the
-    /// user's browser, a file in its default app once `FileResolver` finds
-    /// it from the pane's directory. A link to nothing beeps.
+    /// user's browser, a file once `FileResolver` finds it from the pane's
+    /// directory as `show(_:kind:from:)` does. A link to nothing beeps.
     func openLink(_ text: String, from pane: Pane.ID) {
         switch FileMention(text, home: NSHomeDirectory()) {
         case .web(let url):
             NSWorkspace.shared.open(url)
         case .file(let path):
             let directory = paneViews[pane]?.directory
-            Self.fileQueue.async {
+            Self.fileQueue.async { [weak self] in
                 let found = FileResolver.disk.path(for: path, directory: directory, touched: [])
+                let kind = found.map { DocumentKind(file: URL(filePath: $0), chosen: false) }
                 DispatchQueue.main.async {
-                    guard let found else {
+                    guard let found, let kind else {
                         Logger.app.info("found no file for a link")
                         NSSound.beep()
                         return
                     }
-                    NSWorkspace.shared.open(URL(filePath: found))
+                    self?.show(URL(filePath: found), kind: kind, from: pane)
                 }
             }
         case nil:
             NSSound.beep()
+        }
+    }
+
+    /// Shows a file clicked in `pane`'s tray as `show(_:kind:from:)` does.
+    func showFile(_ url: URL, from pane: Pane.ID) {
+        Self.fileQueue.async { [weak self] in
+            let kind = DocumentKind(file: url, chosen: false)
+            DispatchQueue.main.async { self?.show(url, kind: kind, from: pane) }
+        }
+    }
+
+    /// Shows a file `pane` named in its workspace's viewer, focus staying in
+    /// `pane`, or opens it in its app when Beam leaves its kind to one:
+    /// source code goes to the user's editor.
+    private func show(_ url: URL, kind: DocumentKind, from pane: Pane.ID) {
+        update { store in
+            store.focus(pane)
+            if kind != .external { store.showDocument(url.path, from: pane) }
+        }
+        if kind == .external { NSWorkspace.shared.open(url) }
+    }
+
+    /// Opens a file in its app outside Beam, as a double-click in a tray
+    /// does.
+    func openOutsideBeam(_ url: URL) {
+        Self.fileQueue.async {
+            let app = NSWorkspace.shared.applicationOutsideBeam(toOpen: url)
+            DispatchQueue.main.async {
+                guard let app else {
+                    Logger.app.info("found no app for a file")
+                    NSSound.beep()
+                    return
+                }
+                NSWorkspace.shared.open(
+                    [url], withApplicationAt: app.url, configuration: NSWorkspace.OpenConfiguration())
+            }
         }
     }
 
