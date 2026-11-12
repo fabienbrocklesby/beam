@@ -3,7 +3,8 @@ import BeamCore
 import os
 
 // Files that panes name: links the user Cmd+clicks, and the files an
-// agent's reply names, which the pane's tray previews.
+// agent's reply names, which the pane's tray previews. And files and
+// folders opened from Finder or the Open panel.
 extension MainWindowController {
     /// Where files are looked for on disk, in the order asked, so a turn's
     /// previews never land after the next turn's.
@@ -51,11 +52,12 @@ extension MainWindowController {
             store.focus(pane)
             if kind != .external { store.showDocument(url.path, from: pane) }
         }
-        if kind == .external { NSWorkspace.shared.open(url) }
+        if kind == .external { openOutsideBeam(url) }
     }
 
     /// Opens a file in its app outside Beam, as a double-click in a tray
-    /// does.
+    /// does. Never through `open(_:)`: source code is plain text, so once
+    /// Beam opens plain text the file would come straight back.
     func openOutsideBeam(_ url: URL) {
         Self.fileQueue.async {
             let app = NSWorkspace.shared.applicationOutsideBeam(toOpen: url)
@@ -85,10 +87,21 @@ extension MainWindowController {
                     return
                 }
                 guard kind != .external else {
-                    NSWorkspace.shared.open(url)
+                    self?.openOutsideBeam(url)
                     return
                 }
                 self?.update { $0.updatePane(pane) { $0.document = url.path } }
+            }
+        }
+    }
+
+    /// Opens files and folders as Finder asks: a folder as its workspace, a
+    /// file as `WorkspaceStore.openDocument(_:)` does. The last one ends up
+    /// selected.
+    func open(_ items: [(url: URL, isFolder: Bool)]) {
+        update { store in
+            for item in items {
+                if item.isFolder { store.open(folder: item.url.path) } else { store.openDocument(item.url.path) }
             }
         }
     }

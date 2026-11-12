@@ -15,6 +15,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var daemon: DaemonClient?
     /// The saved store, held until beamd says which of its sessions live.
     private var restoring: (store: WorkspaceStore, loaded: Bool)?
+    /// Files and folders asked for before the window opens on beamd's
+    /// answer: Finder sends them before `applicationDidFinishLaunching`.
+    private var pendingOpens: [(url: URL, isFolder: Bool)] = []
+    /// Where opened files are told from folders, off the main thread.
+    private static let openQueue = DispatchQueue(label: "dev.beam.terminal.open", qos: .userInitiated)
 
     init(ghostty: GhosttyApp) {
         self.ghostty = ghostty
@@ -80,8 +85,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for pane in restore.orphans(in: controller.store, stateLoaded: stateLoaded) {
             daemon?.send(.end(pane: pane))
         }
+        controller.open(pendingOpens)
+        pendingOpens = []
         controller.showWindow(nil)
         NSApp.activate()
+    }
+
+    /// A Finder double-click, Open With, a drop on the Dock icon or an Apple
+    /// event, on a running Beam or the one it launches.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        open(urls)
+    }
+
+    /// Opens `urls` once it knows which are folders. On a cold launch that
+    /// is done while beamd starts, so the window opens on them.
+    private func open(_ urls: [URL]) {
+        Self.openQueue.async { [weak self] in
+            let items = urls.map { url in
+                (url: url, isFolder: (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true)
+            }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                guard let windowController = self.windowController else {
+                    self.pendingOpens += items
+                    return
+                }
+                windowController.open(items)
+                windowController.showWindow(nil)
+            }
+        }
+    }
+
+    /// Shell > Open…: files and folders, opened as Finder opens them.
+    @objc func showOpenPanel(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.begin { [weak self] response in
+            guard response == .OK else { return }
+            self?.open(panel.urls)
+        }
     }
 
     @objc func openSettings(_ sender: Any?) {

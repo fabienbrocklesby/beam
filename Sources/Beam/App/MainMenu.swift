@@ -35,6 +35,9 @@ enum MainMenu {
         app.addItem(.separator())
         app.addItem(appItem("Settings…", #selector(AppDelegate.openSettings(_:)), "open_config"))
         app.addItem(appItem("Reload Configuration", #selector(AppDelegate.reloadConfiguration(_:)), "reload_config"))
+        app.addItem(
+            withTitle: "Make Beam the Default App…", action: #selector(AppDelegate.makeDefaultApp(_:)),
+            keyEquivalent: "")
         app.addItem(.separator())
         app.addItem(withTitle: "Hide Beam", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         app.addItem(
@@ -51,6 +54,8 @@ enum MainMenu {
 
         let shell = NSMenu(title: "Shell")
         shell.addItem(binding("New Workspace…", "new_tab"))
+        // App-wide, so it works before the window opens.
+        shell.addItem(withTitle: "Open…", action: #selector(AppDelegate.showOpenPanel(_:)), keyEquivalent: "o")
         shell.addItem(.separator())
         for entry in LauncherEntry.all {
             let item = NSMenuItem(
