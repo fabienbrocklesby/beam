@@ -32,11 +32,16 @@ back when Beam opens again.
   through their own hooks, keyed by pane rather than guessed from the screen.
   The sidebar marks the panes that need you, Cmd+Shift+U jumps to the next
   one, and a notification arrives while Beam is in the background.
-- **Files agents mention.** Cmd+click a path in any pane to open it; relative
+- **Files agents mention.** Cmd+click a path in any pane: a PDF, Markdown,
+  text file or image shows beside it, and code opens in your editor. Relative
   paths resolve from the pane's folder. Turn on View > Show File Previews and
   the images, PDFs and documents Claude Code or Codex names in a reply show as
   thumbnails under its pane, even when it gives only the file name. Click one
-  for Quick Look, or drag it out.
+  to show it, double-click to open it in its app, or drag it out.
+- **A document viewer.** Files show in a pane of their own and reload as
+  agents write them, keeping your place, with Cmd+F to find in PDFs, Markdown
+  and text. Open them from Finder or Shell > Open… too, or make Beam their
+  default app from the Beam menu.
 - **Sessions survive quit.** A small background process, `beamd`, owns every
   pane's shell. Quit Beam, or have it crash, and shells and agents keep
   running; open it again and each pane is back with the same process, screen
@@ -54,10 +59,10 @@ its Retina display.
 
 | | Measured | Budget |
 |---|---|---|
-| App bundle | 23MB | 30MB |
-| Memory, one window with an idle shell | 78MB | 80MB |
+| App bundle | 24MB | 30MB |
+| Memory, one window with an idle shell | 73MB | 80MB |
 | Memory, a shell and four Claude Code panes | 113MB | 200MB |
-| Cold launch to first prompt | 358ms median | 400ms |
+| Cold launch to first prompt | 268ms median | 400ms |
 
 Memory is the physical footprint, the figure Activity Monitor shows, of the app
 and `beamd`, plus one `beam-attach` per pane in the four-pane reading. The
