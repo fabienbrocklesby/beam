@@ -162,10 +162,15 @@ private final class FindField: NSSearchField {
 
     override func layout() {
         super.layout()
+        // The intrinsic size leaves out the padding the label's cell draws
+        // with, which Auto Layout adds back but a frame set by hand does not:
+        // without it the last digit is cut off.
         let size = label.intrinsicContentSize
-        label.frame = NSRect(
-            x: cancelButtonBounds.minX - size.width - Self.gap / 2, y: ((bounds.height - size.height) / 2).rounded(),
-            width: size.width, height: size.height)
+        label.frame = label.frame(
+            forAlignmentRect: NSRect(
+                x: cancelButtonBounds.minX - size.width - Self.gap / 2,
+                y: ((bounds.height - size.height) / 2).rounded(),
+                width: size.width, height: size.height))
     }
 
     private static let gap = 4.0
