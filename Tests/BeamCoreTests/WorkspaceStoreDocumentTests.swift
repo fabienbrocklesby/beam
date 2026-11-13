@@ -195,6 +195,92 @@ struct WorkspaceStoreDocumentTests {
         #expect(store.workspace(id)?.focusedPane == agent)
     }
 
+    // MARK: Moving to another workspace
+
+    @Test func aFileFromFinderMovesBesideATerminalAndItsWorkspaceCloses() throws {
+        var (store, id, shell) = try makeStore()
+        let document = store.openDocument("/Users/me/Downloads/report.pdf")
+        let finder = try #require(store.selection)
+        #expect(store.canMovePane(document, toWorkspace: id))
+        store.movePane(document, toWorkspace: id)
+
+        #expect(store.workspace(finder) == nil)
+        #expect(store.selection == id)
+        let workspace = try #require(store.workspace(id))
+        #expect(workspace.tree.panes.map(\.id) == [shell, document])
+        #expect(workspace.tree.pane(document)?.document == "/Users/me/Downloads/report.pdf")
+        #expect(workspace.viewer == document)
+        #expect(workspace.focusedPane == document)
+        let column = try #require(frame(of: document, in: store))
+        #expect(column.height == bounds.height)
+        #expect(abs(column.width - bounds.width / 2) <= 1)
+    }
+
+    @Test func besideSeveralPanesTheMovedDocumentTakesFortyPercent() throws {
+        var (store, id, _) = try makeStore()
+        store.openPane(running: "claude", in: id, bounds: bounds)
+        let document = store.openDocument("/Users/me/report.pdf")
+        store.movePane(document, toWorkspace: id)
+
+        let column = try #require(frame(of: document, in: store))
+        #expect(column.height == bounds.height)
+        #expect(abs(column.width - bounds.width * 0.4) <= 1)
+    }
+
+    /// A Cmd+click still goes to the viewer the workspace had.
+    @Test func aWorkspaceWithAViewerKeepsIt() throws {
+        var (store, id, shell) = try makeStore()
+        let viewer = store.showDocument("/w/plan.md", from: shell)
+        let document = store.openDocument("/Users/me/report.pdf")
+        store.movePane(document, toWorkspace: id)
+
+        let workspace = try #require(store.workspace(id))
+        #expect(workspace.viewer == viewer)
+        #expect(workspace.tree.panes.last?.id == document)
+        #expect(workspace.focusedPane == document)
+    }
+
+    @Test func theWorkspaceItLeavesKeepsItsOtherPanes() throws {
+        var (store, id, shell) = try makeStore()
+        let openedViewer = store.showDocument("/w/plan.md", from: shell)
+        let viewer = try #require(openedViewer)
+        store.focus(viewer)
+        let other = store.open(folder: "/other")
+        store.movePane(viewer, toWorkspace: other)
+
+        let workspace = try #require(store.workspace(id))
+        #expect(workspace.tree.panes.map(\.id) == [shell])
+        #expect(workspace.focusedPane == shell)
+        #expect(workspace.viewer == nil)
+        #expect(store.workspace(other)?.tree.contains(viewer) == true)
+    }
+
+    /// A terminal's processes were started with its workspace's ID.
+    @Test func aTerminalDoesNotMoveToAnotherWorkspace() throws {
+        var (store, _, shell) = try makeStore()
+        let other = store.open(folder: "/other")
+        let before = store
+        #expect(!store.canMovePane(shell, toWorkspace: other))
+        store.movePane(shell, toWorkspace: other)
+        #expect(store == before)
+    }
+
+    @Test func aDocumentDoesNotMoveToItsOwnAnArchivedOrAnUnknownWorkspace() throws {
+        var (store, id, _) = try makeStore()
+        let archived = store.open(folder: "/archived")
+        store.setArchived(archived, true)
+        let document = store.openDocument("/Users/me/report.pdf")
+        let own = try #require(store.selection)
+        let before = store
+        for target in [own, archived, Workspace.ID()] {
+            #expect(!store.canMovePane(document, toWorkspace: target))
+            store.movePane(document, toWorkspace: target)
+        }
+        #expect(!store.canMovePane(Pane.ID(), toWorkspace: id))
+        store.movePane(Pane.ID(), toWorkspace: id)
+        #expect(store == before)
+    }
+
     // MARK: Launching
 
     @Test func launchKeepsADocumentWhoseFileIsGone() throws {

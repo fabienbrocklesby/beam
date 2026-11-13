@@ -290,10 +290,44 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
             return viewer
         }
         let viewer = Pane(document: path)
-        let fraction = workspaces[index].tree.panes.count == 1 ? 0.5 : 0.4
-        workspaces[index].tree.insert(viewer, atEdge: .right, fraction: fraction)
+        insertColumn(viewer, inWorkspaceAt: index)
         workspaces[index].viewer = viewer.id
         return viewer.id
+    }
+
+    /// Adds `pane` as a full height column on the right edge of the
+    /// workspace at `index`, half the width beside one pane and 40% beside
+    /// more.
+    private mutating func insertColumn(_ pane: Pane, inWorkspaceAt index: Int) {
+        let fraction = workspaces[index].tree.panes.count == 1 ? 0.5 : 0.4
+        workspaces[index].tree.insert(pane, atEdge: .right, fraction: fraction)
+    }
+
+    /// Whether `pane` can move into workspace `target`: only a document,
+    /// into another workspace that is not archived. A terminal stays, since
+    /// its processes were started with its workspace's ID.
+    public func canMovePane(_ pane: Pane.ID, toWorkspace target: Workspace.ID) -> Bool {
+        guard let source = workspaceID(containing: pane), source != target,
+            let destination = workspace(target), !destination.isArchived
+        else { return false }
+        return workspace(source)?.tree.pane(pane)?.document != nil
+    }
+
+    /// Moves the document pane `pane` into workspace `target` as a column
+    /// on its right edge, sized as a new viewer is, and selects `target`
+    /// with the pane focused. The pane becomes the viewer there when there
+    /// is none. Its old workspace loses it as `closePane` has it, so one a
+    /// file from Finder opened closes.
+    public mutating func movePane(_ pane: Pane.ID, toWorkspace target: Workspace.ID) {
+        guard canMovePane(pane, toWorkspace: target),
+            let moved = workspaceID(containing: pane).flatMap(workspace)?.tree.pane(pane)
+        else { return }
+        closePane(pane)
+        guard let index = index(of: target) else { return }
+        insertColumn(moved, inWorkspaceAt: index)
+        if workspaces[index].viewer == nil { workspaces[index].viewer = pane }
+        workspaces[index].focusedPane = pane
+        select(target)
     }
 
     /// Opens the file at `path` as Finder asks: a pane already showing it
