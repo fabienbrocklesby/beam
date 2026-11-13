@@ -54,6 +54,15 @@ final class PDFFindBar: NSView, NSSearchFieldDelegate {
         stack.spacing = 8
         stack.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         stack.translatesAutoresizingMaskIntoConstraints = false
+        // A pane too narrow for the whole bar drops the arrows, then Done,
+        // rather than squeezing them: a segmented control squeezed narrower
+        // than its segments still draws them, over its neighbours. The field
+        // narrows to its minimum before anything drops, as its compression
+        // resistance is below the stack's clipping resistance. Return,
+        // Shift+Return and Escape do the same jobs.
+        stack.setClippingResistancePriority(NSLayoutConstraint.Priority(500), for: .horizontal)
+        stack.setVisibilityPriority(.detachOnlyIfNecessary, for: steps)
+        stack.setVisibilityPriority(NSStackView.VisibilityPriority(950), for: done)
         addSubview(stack)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
