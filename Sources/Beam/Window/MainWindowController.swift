@@ -98,6 +98,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window.setFrameAutosaveName("Main")
 
         sidebar.onCommand = { [weak self] command, id in self?.perform(command, on: id) }
+        sidebar.canMovePane = { [weak self] pane, id in self?.store.canMovePane(pane, toWorkspace: id) ?? false }
         sidebar.onNewWorkspace = { [weak self] in self?.chooseWorkspaceFolder() }
         sidebar.onFinishRename = { [weak self] in
             self?.window?.makeFirstResponder(self?.focusedPane?.responder)

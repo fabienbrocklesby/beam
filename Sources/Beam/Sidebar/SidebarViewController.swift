@@ -16,6 +16,8 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         case move(pinned: Bool, to: Int)
         /// Renames the workspace to what was typed into its row.
         case rename(String)
+        /// Moves this document pane into the workspace, dropped on its row.
+        case movePane(Pane.ID)
     }
 
     /// What a row shows, so the table reloads only when that changes.
@@ -68,6 +70,9 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
     }
 
     var onCommand: ((Command, Workspace.ID) -> Void)?
+    /// Whether the pane being dragged can move into the workspace. The
+    /// window controller asks the store.
+    var canMovePane: ((Pane.ID, Workspace.ID) -> Bool)?
     /// The Workspaces header's add button was clicked.
     var onNewWorkspace: (() -> Void)?
     /// Return or Escape in a row being renamed: the keyboard goes back to
@@ -98,8 +103,9 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         tableView.dataSource = self
         tableView.delegate = self
         tableView.setAccessibilityLabel("Workspaces")
-        // Rows drag to a new place, the others parting to show where.
-        tableView.registerForDraggedTypes([.beamWorkspace])
+        // Rows drag to a new place, the others parting to show where. A
+        // document pane's header drops onto a row to move it there.
+        tableView.registerForDraggedTypes([.beamWorkspace, .beamPane])
         tableView.setDraggingSourceOperationMask(.move, forLocal: true)
         tableView.draggingDestinationFeedbackStyle = .gap
 
@@ -196,6 +202,13 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         _ tableView: NSTableView, validateDrop info: any NSDraggingInfo, proposedRow row: Int,
         proposedDropOperation dropOperation: NSTableView.DropOperation
     ) -> NSDragOperation {
+        if let pane = Self.pane(in: info) {
+            // Onto the row under the pointer, never a gap between rows.
+            let target = tableView.row(at: tableView.convert(info.draggingLocation, from: nil))
+            guard let workspace = self.row(at: target), canMovePane?(pane, workspace.id) == true else { return [] }
+            tableView.setDropRow(target, dropOperation: .on)
+            return .move
+        }
         // Above the first header is the start of the first section.
         let target = max(row, 1)
         guard destination(above: target) != nil else { return [] }
@@ -207,6 +220,11 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         _ tableView: NSTableView, acceptDrop info: any NSDraggingInfo, row: Int,
         dropOperation: NSTableView.DropOperation
     ) -> Bool {
+        if let pane = Self.pane(in: info) {
+            guard dropOperation == .on, let workspace = self.row(at: row) else { return false }
+            onCommand?(.movePane(pane), workspace.id)
+            return true
+        }
         guard
             let id = info.draggingPasteboard.string(forType: .beamWorkspace)
                 .flatMap(UUID.init(uuidString:)).map({ Workspace.ID(uuid: $0) }),
@@ -214,6 +232,11 @@ final class SidebarViewController: NSViewController, NSTableViewDataSource, NSTa
         else { return false }
         onCommand?(.move(pinned: pinned, to: position), id)
         return true
+    }
+
+    /// The pane a drag from a pane's header carries.
+    private static func pane(in info: any NSDraggingInfo) -> Pane.ID? {
+        info.draggingPasteboard.string(forType: .beamPane).flatMap(UUID.init(uuidString:)).map { Pane.ID(uuid: $0) }
     }
 
     /// Where a drop in the gap above table row `row` lands: whether its

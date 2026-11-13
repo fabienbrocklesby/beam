@@ -149,6 +149,8 @@ extension MainWindowController: NSMenuItemValidation {
             // The edit ended because the keyboard went somewhere: to the
             // terminal on Return or Escape, else to whatever was clicked.
             update(movesKeyboardFocus: false) { $0.rename(id, to: name) }
+        case .movePane(let pane):
+            update { $0.movePane(pane, toWorkspace: id) }
         }
     }
 
