@@ -24,11 +24,16 @@ extension GhosttyApp {
         var modifiers: NSEvent.ModifierFlags
 
         /// Whether `event` presses this key: the same modifiers, and the
-        /// same character with them taken off, so Cmd+Shift+[ is `[`.
+        /// same character with them taken off, so Cmd+Shift+[ is `[`. A
+        /// special key is read as typed: with the modifiers taken off, an
+        /// arrow comes back as an ASCII control character (0x1C to 0x1F),
+        /// not the function key character a menu uses.
         func matches(_ event: NSEvent) -> Bool {
             let relevant: NSEvent.ModifierFlags = [.command, .shift, .option, .control]
+            let character =
+                event.specialKey == nil ? event.characters(byApplyingModifiers: []) : event.charactersIgnoringModifiers
             return event.modifierFlags.intersection(relevant) == modifiers.intersection(relevant)
-                && event.characters(byApplyingModifiers: [])?.lowercased() == key
+                && character?.lowercased() == key
         }
     }
 
