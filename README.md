@@ -86,10 +86,11 @@ terminal.
 Beam runs on Apple Silicon Macs. It has been tested on macOS 27; the app asks
 for macOS 14 or later, but older versions are untested.
 
-Download `Beam-0.1.0.zip` from the
-[releases page](https://github.com/fabienbrocklesby/beam/releases), unzip it
-and move Beam.app to Applications. The app is signed ad hoc, not notarized, so
-macOS refuses to open it until you clear the quarantine flag once:
+Download the DMG from the
+[latest release](https://github.com/fabienbrocklesby/beam/releases/latest),
+open it and drag Beam to Applications. The app is signed ad hoc, not
+notarized, so macOS refuses to open it until you clear the quarantine flag
+once:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/Beam.app
