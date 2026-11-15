@@ -27,7 +27,9 @@ back when Beam opens again.
   agents are doing. Cmd+P switches between workspaces and panes, and Cmd+1 to
   Cmd+9 jump straight to one.
 - **One-click agents.** The title bar has a button for each agent CLI your
-  login shell can find, plus a plain shell. New agent panes tile themselves.
+  login shell can find, plus a plain shell. In a new workspace the first
+  agent takes the place of the shell you have not touched; after that, new
+  agent panes tile themselves.
 - **Agent state.** Claude Code and Codex report working, waiting and done
   through their own hooks, keyed by pane rather than guessed from the screen.
   The sidebar marks the panes that need you, Cmd+Shift+U jumps to the next

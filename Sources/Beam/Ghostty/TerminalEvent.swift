@@ -21,6 +21,9 @@ enum TerminalEvent {
     /// Ghostty's shell integration marks commands, which it does by default
     /// for zsh, bash, fish and elvish.
     case commandFinished
+    /// The user typed, pasted or dropped something into the terminal.
+    /// Reported once: it says the shell is no longer as it started.
+    case input
     /// The user Cmd+clicked a link: a URL, or a path that libghostty made
     /// absolute when it found the file under the shell's directory, and left
     /// as written otherwise.

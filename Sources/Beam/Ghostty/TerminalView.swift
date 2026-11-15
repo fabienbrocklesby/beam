@@ -43,6 +43,8 @@ final class TerminalView: NSView {
     /// through performKeyEquivalent first, and doCommand needs to know whether
     /// to send them back through for encoding.
     private var lastPerformKeyEvent: TimeInterval?
+    /// Whether `.input` has been sent, which it is once.
+    private var hasReportedInput = false
 
     var backingScale: Double { Double(window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2) }
 
@@ -149,6 +151,7 @@ final class TerminalView: NSView {
     }
 
     @objc func paste(_ sender: Any?) {
+        reportInput()
         performBindingAction("paste_from_clipboard")
     }
 
@@ -242,10 +245,39 @@ final class TerminalView: NSView {
 
     // MARK: Keyboard
 
+    /// Tells the window, the first time, that the user put something into
+    /// the terminal.
+    private func reportInput() {
+        guard !hasReportedInput else { return }
+        hasReportedInput = true
+        send(.input)
+    }
+
+    /// How a Ghostty keybinding takes `event`, or nil when none does.
+    private func binding(for event: NSEvent) -> ghostty_binding_flags_e? {
+        guard let surface else { return nil }
+        var keyEvent = event.ghosttyKeyEvent(GHOSTTY_ACTION_PRESS)
+        var flags = ghostty_binding_flags_e(0)
+        let isBinding = (event.characters ?? "").withCString { ptr in
+            keyEvent.text = ptr
+            return ghostty_surface_key_is_binding(surface, keyEvent, &flags)
+        }
+        return isBinding ? flags : nil
+    }
+
     override func keyDown(with event: NSEvent) {
         guard let surface else {
             interpretKeyEvents([event])
             return
+        }
+
+        // A bound key, such as one that switches workspace, puts nothing in
+        // the shell. A performable binding may: paste is bound that way.
+        if !hasReportedInput {
+            let flags = binding(for: event)
+            if flags.map({ $0.rawValue & GHOSTTY_BINDING_FLAGS_PERFORMABLE.rawValue != 0 }) ?? true {
+                reportInput()
+            }
         }
 
         // Option-as-alt and friends: libghostty decides which mods take part in
@@ -326,16 +358,10 @@ final class TerminalView: NSView {
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard event.type == .keyDown, focused, let surface else { return false }
+        guard event.type == .keyDown, focused, surface != nil else { return false }
 
         // Ghostty keybindings (cmd+c, cmd+v, cmd+k, ...) take priority.
-        var keyEvent = event.ghosttyKeyEvent(GHOSTTY_ACTION_PRESS)
-        let isBinding = (event.characters ?? "").withCString { ptr in
-            keyEvent.text = ptr
-            var flags = ghostty_binding_flags_e(0)
-            return ghostty_surface_key_is_binding(surface, keyEvent, &flags)
-        }
-        if isBinding {
+        if binding(for: event) != nil {
             keyDown(with: event)
             return true
         }
@@ -626,6 +652,7 @@ final class TerminalView: NSView {
         guard let data = pasteboard.data(forMIMEType: "text/plain"),
             let text = String(data: data, encoding: .utf8), !text.isEmpty
         else { return false }
+        reportInput()
         // Paste, not type: paste protection asks before text with a newline runs.
         text.withCString { ghostty_surface_paste_text(surface, $0, UInt(text.utf8.count)) }
         return true
@@ -741,7 +768,10 @@ extension TerminalView: NSTextInputClient {
             return
         }
         // Committed text (IME, dictation) is typed input, never a paste.
-        if !chars.isEmpty { _ = committedTextAction(GHOSTTY_ACTION_PRESS, text: chars) }
+        if !chars.isEmpty {
+            reportInput()
+            _ = committedTextAction(GHOSTTY_ACTION_PRESS, text: chars)
+        }
     }
 
     override func doCommand(by selector: Selector) {

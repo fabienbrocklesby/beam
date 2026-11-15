@@ -268,6 +268,32 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
         return pane.id
     }
 
+    /// Opens `command` in workspace `id` as the launcher does. While the
+    /// workspace is nothing but the shell it started and that shell is
+    /// untouched, the command takes the shell's place, so a new workspace
+    /// goes straight to its agent. Otherwise, and for a plain shell, it
+    /// opens in a new pane (see `openPane`).
+    @discardableResult
+    public mutating func launch(_ command: String?, in id: Workspace.ID, bounds: CGRect) -> Pane.ID? {
+        guard let index = index(of: id) else { return nil }
+        guard let command, let shell = workspaces[index].untouchedShell,
+            workspaces[index].tree.panes.map(\.id) == [shell]
+        else { return openPane(running: command, in: id, bounds: bounds) }
+        let pane = Pane(workingDirectory: workspaces[index].folder, command: command)
+        workspaces[index].tree = SplitTree(pane)
+        workspaces[index].focusedPane = pane.id
+        workspaces[index].untouchedShell = nil
+        return pane.id
+    }
+
+    /// Records that `pane`'s shell is no longer as it started: something
+    /// was typed into it or ran in it, so the launcher leaves it be.
+    public mutating func markUsed(_ pane: Pane.ID) {
+        modifyWorkspace(containing: pane) { workspace in
+            if workspace.untouchedShell == pane { workspace.untouchedShell = nil }
+        }
+    }
+
     // MARK: Documents
 
     /// Shows the file at `path` in the viewer of the workspace holding
@@ -383,6 +409,9 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
         }
         if workspaces[index].viewer == pane {
             workspaces[index].viewer = nil
+        }
+        if workspaces[index].untouchedShell == pane {
+            workspaces[index].untouchedShell = nil
         }
         guard workspaces[index].tree.isEmpty else { return }
         let id = workspaces[index].id

@@ -40,6 +40,11 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
     /// The document pane the workspace last showed a file in, which the next
     /// file shown goes into. Absent from files Beam 0.1 wrote.
     public var viewer: Pane.ID?
+    /// The shell the workspace started, while it is still as it started:
+    /// nothing typed into it, nothing run in it. An agent the launcher opens
+    /// takes its place when it is the only pane. Absent from files Beam 0.1
+    /// wrote, whose shells count as used.
+    public var untouchedShell: Pane.ID?
 
     /// A workspace with one shell in `folder`, named after it.
     public init(folder: String) {
@@ -82,6 +87,7 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
         let pane = Pane(workingDirectory: folder)
         tree = SplitTree(pane)
         focusedPane = pane.id
+        untouchedShell = pane.id
     }
 
     /// Closes every pane.
@@ -89,5 +95,6 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
         tree = SplitTree()
         focusedPane = nil
         viewer = nil
+        untouchedShell = nil
     }
 }

@@ -32,11 +32,15 @@ extension MainWindowController: NSMenuItemValidation {
                     $0.command = nil
                     $0.agentSession = nil
                 }
+                $0.markUsed(pane)
             }
             showSidebar()
             // It may have installed an agent.
             installedAgents.refresh()
             if updatePanes.remove(pane) != nil { updates.updateFinished() }
+
+        case .input:
+            update(movesKeyboardFocus: false) { $0.markUsed(pane) }
 
         case .openLink(let text):
             openLink(text, from: pane)
@@ -156,12 +160,13 @@ extension MainWindowController: NSMenuItemValidation {
 
     // MARK: Launcher
 
-    /// Opens `entry` in a new pane in the selected workspace's folder, tiled
-    /// beside the workspace's largest pane.
+    /// Opens `entry` in the selected workspace's folder: in a new pane tiled
+    /// beside the workspace's largest, or, for an agent in a workspace that
+    /// is still only its untouched shell, in that shell's place.
     func open(_ entry: LauncherEntry) {
         guard let id = store.selection else { return }
         let bounds = workspaceView(for: id)?.bounds ?? .zero
-        update { $0.openPane(running: entry.command, in: id, bounds: bounds) }
+        update { $0.launch(entry.command, in: id, bounds: bounds) }
     }
 
     /// Whether `entry` can open now: an agent needs to be installed.

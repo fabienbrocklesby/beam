@@ -195,6 +195,14 @@ struct WorkspaceStoreDocumentTests {
         #expect(store.workspace(id)?.focusedPane == agent)
     }
 
+    @Test func anAgentLaunchedInAFilesWorkspaceKeepsTheDocument() throws {
+        var store = WorkspaceStore()
+        let document = store.openDocument("/w/plan.md")
+        let id = try #require(store.selection)
+        let launched = store.launch("claude", in: id, bounds: bounds)
+        #expect(store.workspace(id)?.tree.panes.map(\.id) == [try #require(launched), document])
+    }
+
     @Test func closingAPinnedFilesWorkspaceRemovesIt() throws {
         var store = WorkspaceStore()
         let other = store.open(folder: "/other")

@@ -354,6 +354,93 @@ struct WorkspaceStoreTests {
         #expect(unknown == nil)
     }
 
+    // MARK: Launching
+
+    @Test func anAgentTakesTheUntouchedShellsPlace() throws {
+        var store = WorkspaceStore()
+        let id = store.create(folder: "/w")
+        let shell = try #require(store.workspace(id)?.focusedPane)
+        let launched = store.launch("claude", in: id, bounds: .zero)
+        let agent = try #require(launched)
+        let workspace = try #require(store.workspace(id))
+        #expect(agent != shell)
+        #expect(workspace.tree.panes.map(\.id) == [agent])
+        #expect(workspace.tree.pane(agent)?.command == "claude")
+        #expect(workspace.tree.pane(agent)?.workingDirectory == "/w")
+        #expect(workspace.focusedPane == agent)
+    }
+
+    @Test func theNextAgentOpensBesideTheFirst() throws {
+        var store = WorkspaceStore()
+        let id = store.create(folder: "/w")
+        let first = store.launch("claude", in: id, bounds: .zero)
+        let second = store.launch("codex", in: id, bounds: .zero)
+        let panes = [try #require(first), try #require(second)]
+        #expect(store.workspace(id)?.tree.panes.map(\.id) == panes)
+    }
+
+    @Test func aShellThatWasUsedIsKept() throws {
+        var store = WorkspaceStore()
+        let id = store.create(folder: "/w")
+        let shell = try #require(store.workspace(id)?.focusedPane)
+        store.markUsed(shell)
+        let launched = store.launch("claude", in: id, bounds: .zero)
+        #expect(store.workspace(id)?.tree.panes.map(\.id) == [shell, try #require(launched)])
+    }
+
+    @Test func aPlainShellOpensBesideTheUntouchedOne() throws {
+        var store = WorkspaceStore()
+        let id = store.create(folder: "/w")
+        let shell = try #require(store.workspace(id)?.focusedPane)
+        let launched = store.launch(nil, in: id, bounds: .zero)
+        #expect(store.workspace(id)?.tree.panes.map(\.id) == [shell, try #require(launched)])
+    }
+
+    /// Only a workspace that is nothing but its untouched shell: beside
+    /// another pane the shell stays, and alone again it gives way.
+    @Test func theUntouchedShellStaysWhileItHasCompany() throws {
+        var store = WorkspaceStore()
+        let id = store.create(folder: "/w")
+        let shell = try #require(store.workspace(id)?.focusedPane)
+        let split = store.split(shell, toward: .right)
+        let other = try #require(split)
+        let beside = store.launch("claude", in: id, bounds: .zero)
+        let first = try #require(beside)
+        #expect(store.workspace(id)?.tree.panes.count == 3)
+
+        store.closePane(other)
+        store.closePane(first)
+        let alone = store.launch("claude", in: id, bounds: .zero)
+        #expect(store.workspace(id)?.tree.panes.map(\.id) == [try #require(alone)])
+    }
+
+    @Test func theShellAnEmptyWorkspaceStartsAgainIsUntouched() throws {
+        var (store, _, two, _) = makeStore()
+        store.setPinned(two, true)
+        let first = try #require(store.workspace(two)?.focusedPane)
+        store.markUsed(first)
+        store.closePane(first)
+        store.select(two)
+        let launched = store.launch("claude", in: two, bounds: .zero)
+        #expect(store.workspace(two)?.tree.panes.map(\.id) == [try #require(launched)])
+    }
+
+    /// A state file from before Beam marked the shell says nothing of
+    /// whether it was used, so it counts as used.
+    @Test func aShellSavedWithoutTheMarkIsKept() throws {
+        var store = WorkspaceStore()
+        store.create(folder: "/w")
+        let data = try JSONEncoder().encode(store)
+        var json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var saved = try #require(json["workspaces"] as? [[String: Any]])
+        #expect(saved[0].removeValue(forKey: "untouchedShell") != nil)
+        json["workspaces"] = saved
+        var old = try JSONDecoder().decode(WorkspaceStore.self, from: try JSONSerialization.data(withJSONObject: json))
+        let id = try #require(old.selection)
+        old.launch("claude", in: id, bounds: .zero)
+        #expect(old.workspace(id)?.tree.panes.count == 2)
+    }
+
     // MARK: Pin, archive, colour
 
     @Test func archivingClosesThePanesAndSelectsTheAdjacentWorkspace() {
