@@ -5,7 +5,8 @@ import Foundation
 ///
 /// A workspace with no panes is either pinned (it stays in the sidebar and
 /// starts a shell when selected again) or archived (hidden until shown or
-/// reopened). An unpinned workspace closes with its last pane.
+/// reopened). An unpinned workspace closes with its last pane. Closing a
+/// workspace itself removes it, pinned or not.
 public struct WorkspaceStore: Codable, Equatable, Sendable {
     /// In the order the user arranged them, new ones last.
     public private(set) var workspaces: [Workspace] = []
@@ -170,15 +171,13 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
 
     // MARK: Closing
 
-    /// Closes every pane in `id`. Unless pinned, the workspace goes too.
+    /// Closes workspace `id` and every pane in it. A pinned one goes too:
+    /// pinning keeps a workspace through its last pane closing, not through
+    /// being closed itself.
     public mutating func close(_ id: Workspace.ID) {
         guard let index = index(of: id) else { return }
         let sidebarBefore = sidebar
-        if workspaces[index].isPinned {
-            workspaces[index].empty()
-        } else {
-            workspaces.remove(at: index)
-        }
+        workspaces.remove(at: index)
         moveSelection(awayFrom: id, in: sidebarBefore)
     }
 
@@ -374,7 +373,8 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
     }
 
     /// Removes `pane`. Focus moves to its neighbour if it had focus; the
-    /// workspace closes with its last pane.
+    /// workspace closes with its last pane, unless pinned, when it stays in
+    /// the sidebar with nothing open.
     public mutating func closePane(_ pane: Pane.ID) {
         guard let index = workspaces.firstIndex(where: { $0.tree.contains(pane) }) else { return }
         let neighbour = workspaces[index].tree.remove(pane)
@@ -384,8 +384,12 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
         if workspaces[index].viewer == pane {
             workspaces[index].viewer = nil
         }
-        if workspaces[index].tree.isEmpty {
-            close(workspaces[index].id)
+        guard workspaces[index].tree.isEmpty else { return }
+        let id = workspaces[index].id
+        if workspaces[index].isPinned {
+            moveSelection(awayFrom: id, in: sidebar)
+        } else {
+            close(id)
         }
     }
 

@@ -282,6 +282,26 @@ struct WorkspaceStoreTests {
         _ = one
     }
 
+    /// Close Workspace used to empty a pinned workspace and leave its row,
+    /// which looked like nothing had happened.
+    @Test func closingAPinnedWorkspaceRemovesIt() {
+        var (store, _, two, three) = makeStore()
+        store.setPinned(two, true)
+        store.select(two)
+        store.close(two)
+        #expect(store.workspace(two) == nil)
+        #expect(store.selection == three)
+    }
+
+    @Test func closingAnEmptyPinnedWorkspaceRemovesIt() throws {
+        var (store, one, two, _) = makeStore()
+        store.setPinned(two, true)
+        store.closePane(try #require(store.workspace(two)?.focusedPane))
+        store.close(two)
+        #expect(store.workspace(two) == nil)
+        #expect(store.selection == one)
+    }
+
     @Test func selectionSkipsEmptyWorkspacesAndEndsWhenNoneAreOpen() throws {
         var store = WorkspaceStore()
         let pinned = store.open(folder: "/pinned")
@@ -293,7 +313,7 @@ struct WorkspaceStoreTests {
     @Test func selectingAnEmptyWorkspaceStartsAShellInItsFolder() throws {
         var (store, _, two, _) = makeStore()
         store.setPinned(two, true)
-        store.close(two)
+        store.closePane(try #require(store.workspace(two)?.focusedPane))
         store.select(two)
         let workspace = try #require(store.workspace(two))
         #expect(workspace.tree.panes.map(\.workingDirectory) == ["/two"])
@@ -324,7 +344,7 @@ struct WorkspaceStoreTests {
     @Test func openingAPaneInAnEmptyWorkspaceFillsIt() throws {
         var (store, one, two, _) = makeStore()
         store.setPinned(two, true)
-        store.close(two)
+        store.closePane(try #require(store.workspace(two)?.focusedPane))
         let opened = store.openPane(running: nil, in: two, bounds: .zero)
         let added = try #require(opened)
         #expect(store.workspace(two)?.tree.panes.map(\.id) == [added])
@@ -373,8 +393,8 @@ struct WorkspaceStoreTests {
         let second = store.open(folder: "/second")
         store.setPinned(first, true)
         store.setPinned(second, true)
-        store.close(second)
-        store.close(first)
+        store.closePane(try #require(store.workspace(second)?.focusedPane))
+        store.closePane(try #require(store.workspace(first)?.focusedPane))
         #expect(store.selection == nil)
 
         store.prepareForLaunch(home: "/home") { _ in true }

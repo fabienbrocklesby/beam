@@ -195,6 +195,17 @@ struct WorkspaceStoreDocumentTests {
         #expect(store.workspace(id)?.focusedPane == agent)
     }
 
+    @Test func closingAPinnedFilesWorkspaceRemovesIt() throws {
+        var store = WorkspaceStore()
+        let other = store.open(folder: "/other")
+        store.openDocument("/w/plan.md")
+        let id = try #require(store.selection)
+        store.setPinned(id, true)
+        store.close(id)
+        #expect(store.workspace(id) == nil)
+        #expect(store.selection == other)
+    }
+
     // MARK: Moving to another workspace
 
     @Test func aFileFromFinderMovesBesideATerminalAndItsWorkspaceCloses() throws {
