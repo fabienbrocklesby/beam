@@ -8,15 +8,25 @@ import os
 /// The login shell runs once, at launch, for its `PATH`. Looking agents up on
 /// that `PATH` is a few file checks, so it is redone whenever one may just
 /// have been installed: when Beam comes forward, and when a command in a
-/// pane finishes. All of it happens off the main thread.
+/// pane finishes. A shell that failed or hung is asked again then too. All
+/// of it happens off the main thread.
 final class InstalledAgents {
     private nonisolated static let queue = DispatchQueue(label: "dev.beam.terminal.agents", qos: .utility)
 
     /// Empty until the login shell has answered.
     private(set) var agents: Set<Agent> = []
     var onChange: (() -> Void)?
-    /// The login shell's `PATH`, once it has answered.
-    private(set) var path: String?
+    /// The login shell answered after failing at launch, so what was read
+    /// on Beam's own `PATH` is worth reading again.
+    var onLoginPath: (() -> Void)?
+    /// Where agents are looked up, once the login shell has been asked.
+    private var searchPath: LoginShell.SearchPath?
+    /// Whether the login shell is being asked, so it is asked once at a time.
+    private var isAsking = false
+
+    /// The login shell's `PATH` once it has answered, and Beam's own while
+    /// it has failed to.
+    var path: String? { searchPath?.path }
 
     /// Lives as long as the process, so its observer and queued work never
     /// outlive it.
@@ -36,26 +46,33 @@ final class InstalledAgents {
         // main.swift has already stripped what launched Beam from this.
         let environment = ProcessInfo.processInfo.environment
         let shell = environment["SHELL"] ?? "/bin/zsh"
+        isAsking = true
         Self.queue.async {
-            let path: String
-            if let login = LoginShell.path(shell: shell, environment: environment, timeout: 10) {
-                path = login
-            } else {
+            let searchPath = LoginShell.searchPath(shell: shell, environment: environment, timeout: 10)
+            if !searchPath.isFromLoginShell {
                 Logger.app.error("could not read the PATH of login shell \(shell, privacy: .public)")
-                path = environment["PATH"] ?? ""
             }
-            let agents = Self.agents(onPath: path)
+            let agents = Self.agents(onPath: searchPath.path)
             DispatchQueue.main.async {
-                self.path = path
+                self.isAsking = false
+                self.searchPath = searchPath
                 self.update(agents)
                 then()
             }
         }
     }
 
-    /// Looks the agents up again on the login shell's `PATH`.
+    /// Looks the agents up again on the login shell's `PATH`. A shell that
+    /// gave none is asked for it again first: one that timed out while the
+    /// Mac was starting up answers later, and Beam's own `PATH` finds
+    /// almost no agents.
     func refresh() {
-        guard let path else { return }
+        guard let searchPath, !isAsking else { return }
+        guard searchPath.isFromLoginShell else {
+            start { if self.searchPath?.isFromLoginShell == true { self.onLoginPath?() } }
+            return
+        }
+        let path = searchPath.path
         Self.queue.async {
             let agents = Self.agents(onPath: path)
             DispatchQueue.main.async { self.update(agents) }

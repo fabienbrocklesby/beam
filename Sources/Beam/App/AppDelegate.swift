@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.agentsMenu.refresh()
             self?.windowController?.showUpdates()
         }
+        installedAgents.onLoginPath = { [updates] in updates.start() }
         installedAgents.start { [updates] in updates.start() }
         StateSaver.load(.standard) { [self] store, loaded in
             guard let daemon = DaemonClient(bundle: .main) else {

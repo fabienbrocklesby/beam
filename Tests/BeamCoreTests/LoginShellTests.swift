@@ -41,6 +41,22 @@ final class LoginShellTests {
         #expect(LoginShell.path(shell: "/no/such/shell", environment: [:], timeout: 10) == nil)
     }
 
+    @Test func theSearchPathIsTheLoginShellsWhenItAnswers() throws {
+        let shell = try makeShell(loginShell)
+        let found = LoginShell.searchPath(shell: shell, environment: ["PATH": "/one:/two"], timeout: 10)
+        #expect(found == LoginShell.SearchPath(path: "/one:/two", isFromLoginShell: true))
+    }
+
+    /// A stand-in used to be kept as if the shell had given it, so a shell
+    /// that failed once, as on a Mac still starting up, was never asked
+    /// again and the launcher showed no agents.
+    @Test func aShellThatFailsLeavesBeamsOwnPathStandingIn() throws {
+        let shell = try makeShell("exit 1")
+        let found = LoginShell.searchPath(shell: shell, environment: ["PATH": "/own"], timeout: 10)
+        #expect(found == LoginShell.SearchPath(path: "/own", isFromLoginShell: false))
+        #expect(LoginShell.searchPath(shell: shell, environment: [:], timeout: 10).path == "")
+    }
+
     @Test func aShellThatHangsIsGivenUpOn() throws {
         // Ignores SIGTERM, as interactive shells do.
         let shell = try makeShell("trap '' TERM; while :; do sleep 1; done")
