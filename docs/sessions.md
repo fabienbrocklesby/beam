@@ -37,6 +37,17 @@ sessions and no Beam connected. A new protocol version means a new socket
 path, so a newer Beam never talks to an older beamd; that older beamd's
 sessions keep running until they end, unseen.
 
+**One Beam.** beamd has one control connection, and a newer one replaces it.
+A second Beam on the same beamd would therefore leave the first without
+agent reports, and end every session its own state file does not name. So
+before it starts its terminal engine, Beam takes an exclusive `flock` on
+`beam-<protocol version>.lock` beside the socket and writes its process ID
+there (`InstanceLock`). A Beam that finds the lock held brings the holder
+forward and exits. The kernel drops the lock however the holder ends, and
+the file is opened close-on-exec so beamd, which outlives Beam, never keeps
+it. If the lock cannot be taken at all, or its holder is not a running app,
+Beam starts anyway: not opening is the worse failure.
+
 **Create and attach are one step.** A surface runs `beam-attach`. It sends
 beamd its pane ID (`BEAM_PANE_ID`), window size, working directory and whole
 environment. If the session exists it attaches; if not, beamd creates it by
@@ -178,11 +189,15 @@ terminal has the cursor at the prompt.
   next launch without that session (after a reboot) resumes it.
 - Quit and End Sessions asks first only for processes running in panes that
   have been shown; sessions of workspaces not yet shown end without asking.
+- A Beam older than the lock holds none, so a newer one started beside it
+  does not stand down.
+- A second Beam that stands down drops the files it was asked to open.
 
 ## Testing
 
 - `BeamCore`: framing, attach header, control messages, report store,
-  pane environment (zsh injection), restore choice (attach or resume).
+  pane environment (zsh injection), restore choice (attach or resume),
+  the instance lock.
 - `BeamDaemonTests`: the replay through a real libghostty-vt terminal.
 - By hand, through beam-attach: stream a long Claude Code response, resize
   mid-stream, scroll back, paste an image path, use an IME, Ctrl+C, Ctrl+Z,
