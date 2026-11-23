@@ -127,16 +127,21 @@ program that pumps bytes to `beamd`, which owns the pane's real pty and keeps a
 copy of its screen in a headless libghostty-vt terminal. When Beam opens again,
 beamd replays that screen, so the pane looks exactly as it did.
 
-Agents started from Beam get hooks on their command line, so Beam never edits
-`~/.claude` or `~/.codex`. The hooks report state through the bundled `beam`
-helper to beamd, which keeps the latest state of every pane while Beam is not
-running. [docs/sessions.md](docs/sessions.md) has the details.
+Agents get hooks on their command line, so Beam never edits `~/.claude` or
+`~/.codex`: Beam adds them to the commands it types, and in zsh a `claude` or
+`codex` you type yourself gets the same ones. The hooks report state through
+the bundled `beam` helper to beamd, which keeps the latest state of every pane
+while Beam is not running. [docs/sessions.md](docs/sessions.md) has the
+details.
 
 ## Known limits
 
-- Agent state covers Claude Code and Codex started from Beam. Gemini and Kimi
-  launch and update but report no state yet, and an agent typed into a shell by
-  hand reports nothing.
+- Agent state covers Claude Code and Codex. Gemini and Kimi launch and update
+  but report no state yet.
+- An agent you type yourself reports its state in zsh. In bash or fish, in a
+  second shell started inside the pane, or behind your own `claude` or `codex`
+  function, it reports nothing unless you pass it the hooks:
+  `claude --settings "$BEAM_CLAUDE_SETTINGS"` or `codex -c "$BEAM_CODEX_HOOKS"`.
 - Codex asks once to trust Beam's hooks (press `t` in `/hooks`).
 - Sessions survive quitting Beam, not logging out or restarting. After a
   restart, panes reopen in their folders and agents resume their conversations.

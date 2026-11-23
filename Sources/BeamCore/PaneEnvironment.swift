@@ -39,15 +39,19 @@ public enum PaneEnvironment {
             .merging(hooks?.environment ?? [:]) { $1 }
     }
 
-    /// What a pane's zsh needs for Ghostty's shell integration (working
-    /// directory, prompt marks, titles), which Ghostty only adds to a command
-    /// it knows as a shell, and a pane's command is beam-attach. As Ghostty
-    /// does: `ZDOTDIR` names the bundled integration `directory`, whose files
-    /// load the user's own from `GHOSTTY_ZSH_ZDOTDIR` when they had a
-    /// `zdotdir`. Other shells get nothing.
-    public static func shellIntegration(shell: String, zdotdir: String?, directory: String) -> [String: String] {
+    /// What a pane's zsh needs for shell integration: Beam's own, which gives
+    /// an agent typed by hand its hooks, and Ghostty's (working directory,
+    /// prompt marks, titles), which Ghostty only adds to a command it knows
+    /// as a shell, and a pane's command is beam-attach. `ZDOTDIR` names
+    /// Beam's bundled `directory`, whose `.zshenv` hands over to Ghostty's in
+    /// `ghostty`, and that loads the user's own files from
+    /// `GHOSTTY_ZSH_ZDOTDIR` when they had a `zdotdir`. Other shells get
+    /// nothing.
+    public static func shellIntegration(
+        shell: String, zdotdir: String?, directory: String, ghostty: String
+    ) -> [String: String] {
         guard (shell as NSString).lastPathComponent == "zsh" else { return [:] }
-        var variables = ["ZDOTDIR": directory]
+        var variables = ["ZDOTDIR": directory, "BEAM_GHOSTTY_ZDOTDIR": ghostty]
         if let zdotdir { variables["GHOSTTY_ZSH_ZDOTDIR"] = zdotdir }
         return variables
     }

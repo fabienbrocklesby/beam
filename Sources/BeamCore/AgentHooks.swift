@@ -1,13 +1,15 @@
 import Foundation
 
-/// How the agents Beam starts report their state: each agent CLI is given
+/// How the agents in a pane report their state: each agent CLI is given
 /// hooks that run the `beam` helper, which passes the hook's payload on to
 /// beamd, at the pane's `BEAM_SOCKET`, with the pane it came from.
 ///
 /// The hooks ride in on the agent's own command line, so the user's settings
 /// files are never edited. Beam types that command line into the user's shell
 /// with the definitions left in variables, which keeps what the user sees and
-/// what their history keeps short.
+/// what their history keeps short. An agent the user types gets the same
+/// arguments from the bundled zsh integration
+/// (`Resources/shell-integration/zsh`), which a test holds to `typed`.
 public struct AgentHooks: Equatable, Sendable {
     /// The `beam` helper inside Beam.app.
     public let helper: String

@@ -70,29 +70,32 @@ struct PaneEnvironmentTests {
         #expect(variables.count == 2 + hooks.environment.count)
     }
 
-    let integration = "/Applications/Beam.app/Contents/Resources/ghostty/shell-integration/zsh"
+    let integration = "/Applications/Beam.app/Contents/Resources/shell-integration/zsh"
+    let ghostty = "/Applications/Beam.app/Contents/Resources/ghostty/shell-integration/zsh"
 
-    /// Ghostty only adds it to a command it knows as a shell, and the pane's
-    /// command is beam-attach.
-    @Test func zshGetsGhosttysShellIntegration() {
+    /// Ghostty only adds its own to a command it knows as a shell, and the
+    /// pane's command is beam-attach.
+    @Test func zshStartsInBeamsIntegrationWhichHandsOverToGhosttys() {
         #expect(
-            PaneEnvironment.shellIntegration(shell: "/bin/zsh", zdotdir: nil, directory: integration) == [
-                "ZDOTDIR": integration
-            ])
+            PaneEnvironment.shellIntegration(shell: "/bin/zsh", zdotdir: nil, directory: integration, ghostty: ghostty)
+                == ["ZDOTDIR": integration, "BEAM_GHOSTTY_ZDOTDIR": ghostty])
     }
 
     @Test func theUsersOwnZdotdirIsKeptForTheIntegrationToLoad() {
         #expect(
             PaneEnvironment.shellIntegration(
-                shell: "/opt/homebrew/bin/zsh", zdotdir: "/Users/me/.zsh", directory: integration)
-                == ["ZDOTDIR": integration, "GHOSTTY_ZSH_ZDOTDIR": "/Users/me/.zsh"])
+                shell: "/opt/homebrew/bin/zsh", zdotdir: "/Users/me/.zsh", directory: integration, ghostty: ghostty)
+                == [
+                    "ZDOTDIR": integration, "BEAM_GHOSTTY_ZDOTDIR": ghostty, "GHOSTTY_ZSH_ZDOTDIR": "/Users/me/.zsh",
+                ])
     }
 
     @Test func otherShellsGetNothing() {
         for shell in ["/bin/bash", "/opt/homebrew/bin/fish", "/bin/zsh-wrapper"] {
             #expect(
-                PaneEnvironment.shellIntegration(shell: shell, zdotdir: "/Users/me/.zsh", directory: integration)
-                    .isEmpty)
+                PaneEnvironment.shellIntegration(
+                    shell: shell, zdotdir: "/Users/me/.zsh", directory: integration, ghostty: ghostty
+                ).isEmpty)
         }
     }
 }

@@ -127,12 +127,24 @@ notifications at launch: the sidebar shows the state then.
 
 Ghostty injects its shell integration only into a command it recognises as a
 shell, and `beam-attach` is not one. Beam adds the zsh injection to the pane
-environment itself, as Ghostty does: `ZDOTDIR` points at the bundled
+environment itself, as Ghostty does: `ZDOTDIR` points at a bundled
 `shell-integration/zsh`, an inherited `ZDOTDIR` moves to
 `GHOSTTY_ZSH_ZDOTDIR`, and `GHOSTTY_SHELL_FEATURES` matches what Ghostty sets.
 That keeps the OSC 7 working directory, prompt marks (which drive
 close confirmation) and titles. bash and fish users get no shell integration
 under beamd yet.
+
+The directory `ZDOTDIR` names is Beam's own (`Resources/shell-integration/zsh`
+in this repository). Its `.zshenv` first sources Ghostty's, found through
+`BEAM_GHOSTTY_ZDOTDIR`, which puts `ZDOTDIR` back and reads the user's files
+as before. Then, in an interactive shell, it defines `claude` and `codex` as
+functions that run the real program with the arguments Beam adds when it
+types the command itself (`AgentHooks.typed`), so an agent typed by hand
+reports its state too. They are defined before the user's own files run: a
+function of the user's with the same name replaces them, and that function
+can pass `--settings "$BEAM_CLAUDE_SETTINGS"` or `-c "$BEAM_CODEX_HOOKS"`
+itself. A second zsh started inside the pane has no wrappers, since zsh
+functions are not inherited.
 
 The formatter writes no prompt marks, so a replayed idle shell would read as
 a running command and ask before closing (with Ghostty's default

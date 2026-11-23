@@ -54,6 +54,8 @@ vtool -set-build-version macos "$minos" "$sdk" -replace \
 # Contents/Resources/terminfo next to the executable.
 share="$root/vendor/ghostty/zig-out/share"
 cp -R "$share/ghostty" "$share/terminfo" "$app/Contents/Resources/"
+# Beam's own zsh integration, which a pane's shell reads before Ghostty's.
+cp -R "$root/Resources/shell-integration" "$app/Contents/Resources/"
 
 # A release ships without debug symbols: they record absolute build paths and
 # serve nothing without the object files they point to. strip warns that it

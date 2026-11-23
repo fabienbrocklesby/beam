@@ -171,16 +171,18 @@ final class DaemonClient {
     }
 
     /// For the user's login shell, which `login` gives every pane whatever
-    /// `$SHELL` Beam inherited, and only when the bundle has the integration.
+    /// `$SHELL` Beam inherited, and only when the bundle has both
+    /// integrations: Beam's own leaves `ZDOTDIR` for Ghostty's to put back.
     private static func shellIntegration(bundle: Bundle) -> [String: String] {
         guard let resources = bundle.resourceURL else { return [:] }
-        let directory = resources.appending(path: "ghostty/shell-integration/zsh").path
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: directory, isDirectory: &isDirectory), isDirectory.boolValue,
+        let directory = resources.appending(path: "shell-integration/zsh").path
+        let ghostty = resources.appending(path: "ghostty/shell-integration/zsh").path
+        let files = [directory, ghostty].map { $0 + "/.zshenv" }
+        guard files.allSatisfy(FileManager.default.isReadableFile(atPath:)),
             let entry = getpwuid(getuid()), let shell = entry.pointee.pw_shell
         else { return [:] }
         return PaneEnvironment.shellIntegration(
             shell: String(cString: shell), zdotdir: ProcessInfo.processInfo.environment["ZDOTDIR"],
-            directory: directory)
+            directory: directory, ghostty: ghostty)
     }
 }
