@@ -9,6 +9,11 @@ if [ ! -d "$app" ]; then
     echo "error: no build/Beam.app, run make app first" >&2
     exit 1
 fi
+# A release names nobody: an identity would put its owner in every copy.
+if ! codesign -dv "$app" 2>&1 | grep -qx 'Signature=adhoc'; then
+    echo "error: build/Beam.app is signed with an identity, run make dmg to build it ad hoc" >&2
+    exit 1
+fi
 version="$(plutil -extract CFBundleShortVersionString raw "$app/Contents/Info.plist")"
 dmg="$root/build/Beam-$version.dmg"
 

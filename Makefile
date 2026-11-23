@@ -36,7 +36,9 @@ bench: app
 launch: app
 	scripts/launch.sh
 
-# build/Beam-<version>.dmg: the app and an Applications link, laid out.
+# build/Beam-<version>.dmg: the app and an Applications link, laid out. Built
+# ad hoc whatever identity signs local builds (see scripts/bundle.sh).
+dmg: export BEAM_CODESIGN_IDENTITY =
 dmg: app
 	scripts/dmg.sh
 

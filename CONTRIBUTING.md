@@ -56,6 +56,12 @@ make launch   # cold launch time against its budget
 make ghostty  # rebuild libghostty, only after a submodule bump
 ```
 
+Builds are signed ad hoc. macOS ties what you grant an ad hoc build (Screen
+Recording, Accessibility) to that one build, so a rebuild asks again. To keep
+a grant across rebuilds, name a signing identity from your keychain in
+`BEAM_CODESIGN_IDENTITY` (`security find-identity -v -p codesigning` lists
+them). `make dmg` always signs ad hoc.
+
 ## Rules
 
 **Keep it simple.** The smallest design that fully solves the problem. No

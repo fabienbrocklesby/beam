@@ -65,9 +65,13 @@ if [ "$config" = release ]; then
         "$app/Contents/Helpers/beamd" "$app/Contents/Helpers/beam-attach" 2>/dev/null
 fi
 
-# Nested code is signed before the bundle that seals it.
+# Nested code is signed before the bundle that seals it. Ad hoc, unless
+# BEAM_CODESIGN_IDENTITY names an identity from the keychain: macOS ties what
+# the user grants an ad hoc build (Screen Recording, say) to that one build,
+# so every rebuild asks again, and an identity keeps the grant.
+identity="${BEAM_CODESIGN_IDENTITY:--}"
 for helper in beam beamd beam-attach; do
-    codesign --force --sign - "$app/Contents/Helpers/$helper" >/dev/null
+    codesign --force --sign "$identity" "$app/Contents/Helpers/$helper" >/dev/null
 done
-codesign --force --sign - "$app" >/dev/null
+codesign --force --sign "$identity" "$app" >/dev/null
 echo "$app"
