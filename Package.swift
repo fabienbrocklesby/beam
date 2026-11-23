@@ -31,8 +31,14 @@ let package = Package(
             name: "Beam",
             dependencies: ["BeamCore", "GhosttyKit"],
             // An AppKit app lives on the main thread; code that runs elsewhere
-            // opts out with `nonisolated`.
-            swiftSettings: strict + [.defaultIsolation(MainActor.self)],
+            // opts out with `nonisolated`. SwiftPM copies both xcframeworks'
+            // headers into one folder, where GhosttyKit's umbrella header
+            // answers for GhosttyVt's too, and clang warns it includes none
+            // of them.
+            swiftSettings: strict + [
+                .defaultIsolation(MainActor.self),
+                .unsafeFlags(["-Xcc", "-Wno-incomplete-umbrella"]),
+            ],
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("Carbon"),
