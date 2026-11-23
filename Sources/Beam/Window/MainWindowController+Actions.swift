@@ -139,12 +139,8 @@ extension MainWindowController: NSMenuItemValidation {
             update { $0.setPinned(id, pinned) }
         case .setColor(let color):
             update { $0.setColor(id, color) }
-        case .setArchived(true):
-            confirmClose("Archive this workspace?", needed: needsConfirmClose(id)) { [weak self] in
-                self?.update { $0.setArchived(id, true) }
-            }
-        case .setArchived(false):
-            update { $0.setArchived(id, false) }
+        case .setArchived(let archived):
+            update { $0.setArchived(id, archived) }
         case .close:
             closeWorkspace(id)
         case .move(let pinned, let position):

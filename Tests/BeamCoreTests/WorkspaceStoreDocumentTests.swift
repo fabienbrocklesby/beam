@@ -137,12 +137,14 @@ struct WorkspaceStoreDocumentTests {
         #expect(frame(of: viewer, in: store) == column)
     }
 
-    @Test func archivingTheWorkspaceClearsItsViewer() throws {
+    @Test func archivingTheWorkspaceKeepsItsViewer() throws {
         var (store, id, shell) = try makeStore()
-        store.showDocument("/w/plan.md", from: shell)
+        let shown = store.showDocument("/w/plan.md", from: shell)
+        let viewer = try #require(shown)
         store.open(folder: "/other")
         store.setArchived(id, true)
-        #expect(store.workspace(id)?.viewer == nil)
+        #expect(store.workspace(id)?.viewer == viewer)
+        #expect(store.workspace(id)?.tree.pane(viewer)?.document == "/w/plan.md")
     }
 
     // MARK: Opening from Finder

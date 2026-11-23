@@ -443,12 +443,29 @@ struct WorkspaceStoreTests {
 
     // MARK: Pin, archive, colour
 
-    @Test func archivingClosesThePanesAndSelectsTheAdjacentWorkspace() {
+    /// Archiving used to close the panes, which ended the agents in them.
+    @Test func archivingKeepsThePanesAndSelectsTheAdjacentWorkspace() throws {
         var (store, one, two, _) = makeStore()
+        let before = try #require(store.workspace(one))
         store.setArchived(one, true)
         #expect(store.workspace(one)?.isArchived == true)
-        #expect(store.workspace(one)?.tree.isEmpty == true)
+        #expect(store.workspace(one)?.tree == before.tree)
         #expect(store.selection == two)
+
+        store.select(one)
+        #expect(store.workspace(one) == before)
+    }
+
+    @Test func anArchivedWorkspaceOutlivesItsLastPane() throws {
+        var (store, one, two, _) = makeStore()
+        store.setArchived(two, true)
+        store.closePane(try #require(store.workspace(two)?.focusedPane))
+        #expect(store.workspace(two)?.isArchived == true)
+        #expect(store.workspace(two)?.tree.isEmpty == true)
+        #expect(store.selection == one)
+
+        store.select(two)
+        #expect(store.workspace(two)?.tree.panes.map(\.workingDirectory) == ["/two"])
     }
 
     @Test func colourIsStored() {

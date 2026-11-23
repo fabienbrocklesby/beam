@@ -3,10 +3,11 @@ import Foundation
 /// Every workspace, which one is selected, and the rules for opening,
 /// closing and ordering them.
 ///
-/// A workspace with no panes is either pinned (it stays in the sidebar and
-/// starts a shell when selected again) or archived (hidden until shown or
-/// reopened). An unpinned workspace closes with its last pane. Closing a
-/// workspace itself removes it, pinned or not.
+/// Archiving hides a workspace until it is shown or selected again and keeps
+/// its panes, so whatever runs in them carries on. A workspace with no panes
+/// is pinned or archived, and starts a shell when selected again; any other
+/// closes with its last pane. Closing a workspace itself removes it, pinned
+/// or not.
 public struct WorkspaceStore: Codable, Equatable, Sendable {
     /// In the order the user arranged them, new ones last.
     public private(set) var workspaces: [Workspace] = []
@@ -181,6 +182,9 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
         moveSelection(awayFrom: id, in: sidebarBefore)
     }
 
+    /// Archives `id` or brings it back. Its panes stay as they are: only a
+    /// pane leaving the store ends its session, so an archived workspace's
+    /// agents keep working out of sight.
     public mutating func setArchived(_ id: Workspace.ID, _ archived: Bool) {
         guard let index = index(of: id) else { return }
         guard archived else {
@@ -189,7 +193,6 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
         }
         let sidebarBefore = sidebar
         workspaces[index].isArchived = true
-        workspaces[index].empty()
         moveSelection(awayFrom: id, in: sidebarBefore)
     }
 
@@ -399,8 +402,8 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
     }
 
     /// Removes `pane`. Focus moves to its neighbour if it had focus; the
-    /// workspace closes with its last pane, unless pinned, when it stays in
-    /// the sidebar with nothing open.
+    /// workspace closes with its last pane, unless pinned or archived, when
+    /// it stays where it is with nothing open.
     public mutating func closePane(_ pane: Pane.ID) {
         guard let index = workspaces.firstIndex(where: { $0.tree.contains(pane) }) else { return }
         let neighbour = workspaces[index].tree.remove(pane)
@@ -415,7 +418,7 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
         }
         guard workspaces[index].tree.isEmpty else { return }
         let id = workspaces[index].id
-        if workspaces[index].isPinned {
+        if workspaces[index].isPinned || workspaces[index].isArchived {
             moveSelection(awayFrom: id, in: sidebar)
         } else {
             close(id)

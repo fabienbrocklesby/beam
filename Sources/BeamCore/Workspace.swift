@@ -89,12 +89,4 @@ public struct Workspace: Codable, Equatable, Identifiable, Sendable {
         focusedPane = pane.id
         untouchedShell = pane.id
     }
-
-    /// Closes every pane.
-    mutating func empty() {
-        tree = SplitTree()
-        focusedPane = nil
-        viewer = nil
-        untouchedShell = nil
-    }
 }
