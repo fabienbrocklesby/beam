@@ -3,9 +3,19 @@
 public struct SessionRestore: Equatable, Sendable {
     /// Panes whose session beamd still runs.
     public let live: Set<Pane.ID>
+    /// What the agents still running reported while Beam was not, to apply
+    /// in order. An agent that has ended left nothing to show, and beamd
+    /// keeps its start, which is no longer one to resume.
+    public let reports: [AgentReport]
 
     public init(live: some Sequence<Pane.ID>) {
         self.live = Set(live)
+        reports = []
+    }
+
+    public init(sessions: [ControlEvent.Session]) {
+        live = Set(sessions.map(\.pane))
+        reports = sessions.filter { $0.reports.last?.event != .ended }.flatMap(\.reports)
     }
 
     /// What `pane` types into its terminal as it starts. A live session is

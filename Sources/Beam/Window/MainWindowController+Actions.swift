@@ -24,8 +24,8 @@ extension MainWindowController: NSMenuItemValidation {
             update { $0.updatePane(pane) { $0.workingDirectory = directory } }
 
         case .commandFinished:
-            // The first command a pane's shell runs is the one Beam typed, so
-            // once any command finishes, nothing Beam started is running.
+            // A shell runs one command at a time, so once any finishes,
+            // neither what Beam typed nor an agent typed since is running.
             activity.forget(pane)
             update(movesKeyboardFocus: false) {
                 $0.updatePane(pane) {

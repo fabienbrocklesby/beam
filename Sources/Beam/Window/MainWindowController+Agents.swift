@@ -10,12 +10,7 @@ extension MainWindowController {
         // The pane may have closed since its agent's hook ran.
         guard store.workspaceID(containing: report.pane) != nil else { return }
         if case .started(let session) = report.event {
-            update(movesKeyboardFocus: false) {
-                $0.updatePane(report.pane) { pane in
-                    // Only an agent Beam started is resumed, by its command.
-                    if pane.command != nil { pane.agentSession = session }
-                }
-            }
+            update(movesKeyboardFocus: false) { $0.agentStarted(report.agent, session: session, in: report.pane) }
         }
         if let lookup = turnFiles.record(report) { showPreviews(of: lookup, in: report.pane) }
         let needsUser = activity.apply(report.event, from: report.agent, to: report.pane)

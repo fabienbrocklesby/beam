@@ -571,6 +571,41 @@ struct WorkspaceStoreTests {
         #expect(tree.pane(claude)?.agentSession == "00893aaf-19fa-41d2-8238-13269b9b3ca0")
     }
 
+    /// Beam typed nothing into a shell the user started an agent in, so the
+    /// agent's own report is all that says it runs there.
+    @Test func launchResumesAnAgentTheUserTyped() throws {
+        var store = WorkspaceStore()
+        let id = store.open(folder: "/w")
+        let bounds = CGRect(x: 0, y: 0, width: 1000, height: 600)
+        let claude = try #require(store.workspace(id)?.focusedPane)
+        let openedCodex = store.openPane(running: nil, in: id, bounds: bounds)
+        let codex = try #require(openedCodex)
+        store.agentStarted(.claude, session: "00893aaf-19fa-41d2-8238-13269b9b3ca0", in: claude)
+        store.agentStarted(.codex, session: nil, in: codex)
+
+        store.prepareForLaunch(home: "/home") { _ in true }
+        let tree = try #require(store.workspace(id)?.tree)
+        #expect(tree.pane(claude)?.command == "claude --resume 00893aaf-19fa-41d2-8238-13269b9b3ca0")
+        #expect(tree.pane(codex)?.command == "codex resume --last")
+    }
+
+    @Test func anAgentThatStartsKeepsTheCommandBeamTyped() throws {
+        var store = WorkspaceStore()
+        let id = store.open(folder: "/w")
+        let bounds = CGRect(x: 0, y: 0, width: 1000, height: 600)
+        let openedClaude = store.openPane(running: "claude --resume old", in: id, bounds: bounds)
+        let openedServer = store.openPane(running: "npm run dev", in: id, bounds: bounds)
+        let claude = try #require(openedClaude)
+        let server = try #require(openedServer)
+        store.agentStarted(.claude, session: "new", in: claude)
+        store.agentStarted(.claude, session: "new", in: server)
+
+        let tree = try #require(store.workspace(id)?.tree)
+        #expect(tree.pane(claude)?.command == "claude --resume old")
+        #expect(tree.pane(claude)?.agentSession == "new")
+        #expect(tree.pane(server)?.command == "npm run dev")
+    }
+
     @Test func aPaneWithoutAnAgentSessionLoads() throws {
         let pane = try JSONDecoder().decode(
             Pane.self,

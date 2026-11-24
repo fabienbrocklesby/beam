@@ -30,8 +30,9 @@ public struct Pane: Codable, Equatable, Identifiable, Sendable {
     /// for a document.
     public var workingDirectory: String?
     /// Typed into the pane's shell as it starts, so it runs with everything
-    /// the user's rc files set up. Cleared once it finishes, so a relaunch
-    /// only starts again what was still running.
+    /// the user's rc files set up, or the agent the user typed there since
+    /// (see `WorkspaceStore.agentStarted`). Cleared once it finishes, so a
+    /// relaunch only starts again what was still running.
     public var command: String?
     /// The session `command`'s agent reported, so a relaunch resumes that
     /// conversation rather than the folder's most recent one.

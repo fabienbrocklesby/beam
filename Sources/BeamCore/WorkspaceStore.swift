@@ -289,6 +289,17 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
         return pane.id
     }
 
+    /// Records that `agent` reported starting `session` in `pane`, so a
+    /// relaunch resumes it. An agent the user typed is resumed like one Beam
+    /// typed: with no command of Beam's in the pane, the agent's stands in
+    /// until the shell says it finished.
+    public mutating func agentStarted(_ agent: Agent, session: String?, in pane: Pane.ID) {
+        updatePane(pane) { pane in
+            if pane.command == nil { pane.command = agent.command }
+            pane.agentSession = session
+        }
+    }
+
     /// Records that `pane`'s shell is no longer as it started: something
     /// was typed into it or ran in it, so the launcher leaves it be.
     public mutating func markUsed(_ pane: Pane.ID) {

@@ -76,13 +76,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// what their agents reported while Beam was not running shows in the
     /// sidebar, and sessions no pane wants are ended.
     private func openWindow(_ store: WorkspaceStore, sessions: [ControlEvent.Session], stateLoaded: Bool) {
-        let restore = SessionRestore(live: sessions.map(\.pane))
+        let restore = SessionRestore(sessions: sessions)
         let controller = MainWindowController(
             ghostty: ghostty, store: store, saver: saver, installedAgents: installedAgents, updates: updates,
             updatesMenu: agentsMenu.makeMenu(pullDown: true), hooks: daemon == nil ? nil : agentHooks(), daemon: daemon,
             restore: restore, notifier: notifier)
         windowController = controller
-        for report in sessions.flatMap(\.reports) { controller.handle(report, notifies: false) }
+        for report in restore.reports { controller.handle(report, notifies: false) }
         for pane in restore.orphans(in: controller.store, stateLoaded: stateLoaded) {
             daemon?.send(.end(pane: pane))
         }

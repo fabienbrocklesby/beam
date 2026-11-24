@@ -35,6 +35,24 @@ struct SessionRestoreTests {
         #expect(restore.initialCommand(for: Pane(command: "codex")) == "codex")
     }
 
+    /// beamd keeps an agent's start after it exits, and Beam missed its shell
+    /// saying so. Applied to the store, that start would resume it.
+    @Test func anAgentThatEndedWhileBeamWasAwayReportsNothing() {
+        let (running, ended, shell) = (Pane.ID(), Pane.ID(), Pane.ID())
+        func report(_ event: AgentReport.Event, in pane: Pane.ID) -> AgentReport {
+            AgentReport(pane: pane, agent: .claude, event: event)
+        }
+        let kept = [report(.started(session: "a"), in: running), report(.working, in: running)]
+        let over = [report(.started(session: "b"), in: ended), report(.ended, in: ended)]
+        let restore = SessionRestore(sessions: [
+            ControlEvent.Session(pane: running, reports: kept),
+            ControlEvent.Session(pane: ended, reports: over),
+            ControlEvent.Session(pane: shell, reports: []),
+        ])
+        #expect(restore.live == [running, ended, shell])
+        #expect(restore.reports == kept)
+    }
+
     @Test func liveSessionsNoPaneWantsAreOrphans() {
         let (store, shell, agent) = relaunched()
         let orphan = Pane.ID()

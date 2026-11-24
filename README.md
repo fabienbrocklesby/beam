@@ -47,7 +47,9 @@ back when Beam opens again.
 - **Sessions survive quit.** A small background process, `beamd`, owns every
   pane's shell. Quit Beam, or have it crash, and shells and agents keep
   running; open it again and each pane is back with the same process, screen
-  and scrollback. Beam > Quit and End Sessions stops them all.
+  and scrollback. Beam > Quit and End Sessions stops them all. After the Mac
+  restarts, each pane that was running an agent resumes its conversation,
+  whether Beam started the agent or you typed it.
 - **Agent updates.** The Agents menu shows each agent's installed and latest
   version and how it was installed (Homebrew, mise, npm, uv or its own
   installer), and updates it in one click.
