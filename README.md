@@ -50,6 +50,10 @@ back when Beam opens again.
   and scrollback. Beam > Quit and End Sessions stops them all. After the Mac
   restarts, each pane that was running an agent resumes its conversation,
   whether Beam started the agent or you typed it.
+- **Past conversations.** Cmd+Y lists the Claude Code conversations kept for
+  the workspace's folder and the folders inside it, newest first. Type to
+  filter, and Return opens one in a new pane, or shows the pane it is
+  already open in.
 - **Agent updates.** The Agents menu shows each agent's installed and latest
   version and how it was installed (Homebrew, mise, npm, uv or its own
   installer), and updates it in one click.

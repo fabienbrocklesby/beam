@@ -370,6 +370,70 @@ struct WorkspaceStoreTests {
         #expect(workspace.focusedPane == agent)
     }
 
+    // MARK: Resuming a conversation
+
+    private func conversation(_ session: String, in folder: String = "/w") -> Conversation {
+        Conversation(
+            agent: .claude, session: session, folder: folder, title: "Restore sessions",
+            modified: Date(timeIntervalSince1970: 0))
+    }
+
+    @Test func aConversationOpensWhereItRanAndResumesItsSession() throws {
+        var store = WorkspaceStore()
+        let id = store.create(folder: "/w")
+        let shell = try #require(store.workspace(id)?.focusedPane)
+        store.markUsed(shell)
+        let bounds = CGRect(x: 0, y: 0, width: 1000, height: 600)
+
+        let resumed = store.resume(conversation("abc-123", in: "/w/Sources"), in: id, bounds: bounds)
+        let pane = try #require(resumed)
+        let workspace = try #require(store.workspace(id))
+        #expect(Set(workspace.tree.panes.map(\.id)) == [shell, pane])
+        #expect(workspace.tree.pane(pane)?.command == "claude --resume abc-123")
+        #expect(workspace.tree.pane(pane)?.workingDirectory == "/w/Sources")
+        #expect(workspace.tree.pane(pane)?.agentSession == "abc-123")
+        #expect(workspace.focusedPane == pane)
+    }
+
+    @Test func aConversationTakesTheUntouchedShellsPlace() throws {
+        var store = WorkspaceStore()
+        let id = store.create(folder: "/w")
+        let resumed = store.resume(conversation("abc-123", in: "/w/Sources"), in: id, bounds: .zero)
+        let pane = try #require(resumed)
+        let workspace = try #require(store.workspace(id))
+        #expect(workspace.tree.panes.map(\.id) == [pane])
+        #expect(workspace.tree.pane(pane)?.workingDirectory == "/w/Sources")
+    }
+
+    @Test func aConversationAlreadyOpenIsShownWhereItIs() throws {
+        var store = WorkspaceStore()
+        let first = store.create(folder: "/w")
+        let opened = store.resume(conversation("abc-123"), in: first, bounds: .zero)
+        let pane = try #require(opened)
+        let second = store.create(folder: "/w")
+        #expect(store.selection == second)
+
+        #expect(store.resume(conversation("abc-123"), in: second, bounds: .zero) == pane)
+        #expect(store.selection == first)
+        #expect(store.workspace(first)?.focusedPane == pane)
+        #expect(store.workspace(second)?.tree.panes.count == 1)
+        #expect(store.workspace(first)?.tree.panes.count == 1)
+    }
+
+    /// A pane keeps its session's ID until its shell says the agent
+    /// finished, which clears both. One left behind names nothing running.
+    @Test func aConversationWhoseAgentExitedOpensAgain() throws {
+        var store = WorkspaceStore()
+        let id = store.create(folder: "/w")
+        let opened = store.resume(conversation("abc-123"), in: id, bounds: .zero)
+        let exited = try #require(opened)
+        store.updatePane(exited) { $0.command = nil }
+
+        let again = store.resume(conversation("abc-123"), in: id, bounds: .zero)
+        #expect(again != nil)
+        #expect(again != exited)
+    }
+
     @Test func theNextAgentOpensBesideTheFirst() throws {
         var store = WorkspaceStore()
         let id = store.create(folder: "/w")

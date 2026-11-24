@@ -63,6 +63,10 @@ enum MainMenu {
             item.representedObject = entry
             shell.addItem(item)
         }
+        // Cmd+Y shows history in Safari, and Ghostty binds nothing to it.
+        shell.addItem(
+            withTitle: "Resume Conversation…", action: #selector(MainWindowController.showConversations(_:)),
+            keyEquivalent: "y")
         shell.addItem(.separator())
         shell.addItem(binding("Split Right", "new_split:right"))
         shell.addItem(binding("Split Down", "new_split:down"))

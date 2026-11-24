@@ -204,14 +204,19 @@ extension MainWindowController: NSMenuItemValidation {
         update { $0.showsArchived.toggle() }
     }
 
-    /// Opens the switcher near the top of the window, or closes it.
+    /// Opens the switcher on everything there is to go to, or closes it.
     @objc func toggleSwitcher(_ sender: Any?) {
         guard switcher == nil else {
             closeSwitcher()
             return
         }
+        showSwitcher(switcherItems() + launcherItems(), placeholder: "Go to a workspace or pane, or open an agent")
+    }
+
+    /// Opens the switcher on `items` near the top of the window.
+    func showSwitcher(_ items: [SwitcherViewController.Item], placeholder: String) {
         guard let window else { return }
-        let controller = SwitcherViewController(items: switcherItems() + launcherItems())
+        let controller = SwitcherViewController(items: items, placeholder: placeholder)
         controller.onPick = { [weak self] target in
             self?.closeSwitcher()
             self?.go(to: target)
@@ -232,7 +237,7 @@ extension MainWindowController: NSMenuItemValidation {
         panel.makeKeyAndOrderFront(nil)
     }
 
-    private func closeSwitcher() {
+    func closeSwitcher() {
         guard let panel = switcher else { return }
         switcher = nil
         window?.removeChildWindow(panel)
@@ -289,6 +294,10 @@ extension MainWindowController: NSMenuItemValidation {
             update { $0.select(id) }
         case .pane(let pane):
             reveal(pane)
+        case .conversation(let conversation):
+            guard let id = store.selection else { return }
+            let bounds = workspaceView(for: id)?.bounds ?? .zero
+            update { $0.resume(conversation, in: id, bounds: bounds) }
         }
     }
 
@@ -316,6 +325,8 @@ extension MainWindowController: NSMenuItemValidation {
             return focusedPane != nil
         case #selector(openLauncherEntry(_:)):
             return (menuItem.representedObject as? LauncherEntry).map(canOpen) ?? false
+        case #selector(showConversations(_:)):
+            return canOpen(.agent(.claude))
         case #selector(goToNextAgentNeedingUser(_:)):
             return nextAgentNeedingUser != nil
         case #selector(updateAgent(_:)), #selector(updateAllAgents(_:)):

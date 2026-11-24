@@ -275,18 +275,43 @@ public struct WorkspaceStore: Codable, Equatable, Sendable {
     /// workspace is nothing but the shell it started and that shell is
     /// untouched, the command takes the shell's place, so a new workspace
     /// goes straight to its agent. Otherwise, and for a plain shell, it
-    /// opens in a new pane (see `openPane`).
+    /// opens in a new pane (see `openPane`). Either starts in the
+    /// workspace's folder, or in `folder`.
     @discardableResult
-    public mutating func launch(_ command: String?, in id: Workspace.ID, bounds: CGRect) -> Pane.ID? {
+    public mutating func launch(
+        _ command: String?, in id: Workspace.ID, folder: String? = nil, bounds: CGRect
+    ) -> Pane.ID? {
         guard let index = index(of: id) else { return nil }
         guard let command, let shell = workspaces[index].untouchedShell,
             workspaces[index].tree.panes.map(\.id) == [shell]
-        else { return openPane(running: command, in: id, bounds: bounds) }
-        let pane = Pane(workingDirectory: workspaces[index].folder, command: command)
+        else { return openPane(running: command, in: id, folder: folder, bounds: bounds) }
+        let pane = Pane(workingDirectory: folder ?? workspaces[index].folder, command: command)
         workspaces[index].tree = SplitTree(pane)
         workspaces[index].focusedPane = pane.id
         workspaces[index].untouchedShell = nil
         return pane.id
+    }
+
+    /// Opens `conversation` again in workspace `id`, as the launcher opens
+    /// its agent, in the folder it ran in. One a pane is already running is
+    /// shown where it is instead: two agents writing one session would
+    /// each lose what the other said.
+    @discardableResult
+    public mutating func resume(_ conversation: Conversation, in id: Workspace.ID, bounds: CGRect) -> Pane.ID? {
+        let running = workspaces.lazy.flatMap(\.tree.panes).first {
+            $0.command != nil && $0.agentSession == conversation.session
+        }
+        if let running, let workspace = workspaceID(containing: running.id) {
+            select(workspace)
+            focus(running.id)
+            return running.id
+        }
+        guard let command = conversation.agent.resumeCommand(session: conversation.session),
+            let pane = launch(command, in: id, folder: conversation.folder, bounds: bounds)
+        else { return nil }
+        // Known before the agent reports it, so picking it twice opens it once.
+        updatePane(pane) { $0.agentSession = conversation.session }
+        return pane
     }
 
     /// Records that `agent` reported starting `session` in `pane`, so a

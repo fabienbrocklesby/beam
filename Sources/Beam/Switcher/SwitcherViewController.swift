@@ -1,10 +1,10 @@
 import AppKit
 import BeamCore
 
-/// Cmd+P: a search field over every workspace and pane, and what the
-/// launcher can open, ranked as the user types. Up and Down move, Return
-/// picks, Escape cancels. It reports the pick; the window controller acts
-/// on it.
+/// A search field over a list, ranked as the user types: for Cmd+P, every
+/// workspace and pane and what the launcher can open; for Cmd+Y, a
+/// workspace's past conversations. Up and Down move, Return picks, Escape
+/// cancels. It reports the pick; the window controller acts on it.
 final class SwitcherViewController: NSViewController, NSTextFieldDelegate, NSTableViewDataSource,
     NSTableViewDelegate
 {
@@ -13,11 +13,13 @@ final class SwitcherViewController: NSViewController, NSTextFieldDelegate, NSTab
             case workspace(Workspace.ID)
             case pane(Pane.ID)
             case launch(LauncherEntry)
+            case conversation(Conversation)
         }
 
         let target: Target
         let title: String
-        /// For a pane, its workspace's name.
+        /// For a pane, its workspace's name. For a conversation, how long
+        /// ago it was last written to.
         let detail: String
         /// An SF Symbol name.
         let symbol: String
@@ -40,13 +42,16 @@ final class SwitcherViewController: NSViewController, NSTextFieldDelegate, NSTab
     private static let listInset = 6.0
 
     private let items: [Item]
+    private let placeholder: String
     private var results: [(item: Item, match: FuzzyMatch)] = []
     private let field = NSTextField()
     private let tableView = NSTableView()
     private let scrollView = NSScrollView()
 
-    init(items: [Item]) {
+    /// `placeholder` says what the list holds, in the empty search field.
+    init(items: [Item], placeholder: String) {
         self.items = items
+        self.placeholder = placeholder
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -74,8 +79,8 @@ final class SwitcherViewController: NSViewController, NSTextFieldDelegate, NSTab
         field.drawsBackground = false
         field.focusRingType = .none
         field.font = .systemFont(ofSize: 20)
-        field.placeholderString = "Go to a workspace or pane, or open an agent"
-        field.setAccessibilityLabel("Go to a workspace or pane, or open an agent")
+        field.placeholderString = placeholder
+        field.setAccessibilityLabel(placeholder)
         field.delegate = self
         field.cell?.isScrollable = true
         let fieldLine = field.intrinsicContentSize.height
